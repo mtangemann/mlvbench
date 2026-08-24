@@ -1,0 +1,4 @@
+# Default configuration for the experiment.
+
+models:
+  - standard25

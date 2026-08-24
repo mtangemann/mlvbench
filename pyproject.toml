@@ -1,0 +1,71 @@
+[project]
+name = "mlvbench"
+version = "1.0.0"
+description = "Human vs. Machine Mid-Level Vision"
+readme = "README.md"
+authors = [
+    { name = "Matthias Tangemann", email = "mtangemann@cs.toronto.edu" },
+    { name = "Benjamin Lo", email = "benjamin.lo2@mail.mcgill.ca" },
+]
+requires-python = ">=3.14"
+dependencies = [
+    "coloredlogs>=15.0.1",
+    "datasets>=3.0",
+    "diffusers[torch]>=0.37.1",
+    "einops>=0.8.2",
+    "ipykernel>=7.2.0",
+    "matplotlib>=3.10.8",
+    "numpy>=2.4.2",
+    "opencv-python>=4.13.0.92",
+    "pillow>=12.1.1",
+    "pyarrow>=24.0.0",
+    "quarto>=0.1.0",
+    "scikit-image>=0.26.0",
+    "scikit-posthocs>=0.14.0",
+    "seaborn>=0.13.2",
+    "submitit>=1.5.4",
+    "tabulate>=0.9.0",
+    "timm>=1.0.25",
+    "torch>=2.10.0",
+    "torcheval>=0.0.7",
+    "transformers>=5.5.0",
+    "typer>=0.24.1",
+    "tyro>=1.0.13",
+    "webdataset>=1.0.2",
+    "xformers>=0.0.35; sys_platform == 'linux'",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[dependency-groups]
+dev = [
+    "mkdocstrings[python]>=1.0.4",
+    "pandas-stubs>=3.0.5.260730",
+    "pytest>=9.0.2",
+    "pytest-cov>=7.0.0",
+    "ruff>=0.15.4",
+    "zensical>=0.0.45",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+markers = [
+    "requires_cuda: Test requires a CUDA device (skipped when none is available).",
+]
+
+[tool.ruff]
+lint.select = ["B", "D", "D400", "D401", "D404", "E", "F", "FIX", "I", "T20", "W"]
+lint.ignore = ["FIX002"]
+
+[tool.ruff.lint.per-file-ignores]
+"experiments/**/launch.py" = ["T201", "D103"]
+"mlvbench/models/__main__.py" = ["T201"]
+"tests/*" = ["D"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.setuptools]
+packages = ["mlvbench"]
