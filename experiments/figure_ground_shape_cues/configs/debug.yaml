@@ -1,0 +1,12 @@
+# Minimal configuration for debugging the launch script.
+
+base:
+  max_steps: 100
+
+models:
+- timm/vit_tiny_patch16_224.augreg_in21k_ft_in1k
+- timm/deit_tiny_distilled_patch16_224.fb_in1k
+
+conditions:
+  - natural
+  - surroundedness

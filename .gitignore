@@ -1,0 +1,31 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+# Environment configuration
+.env
+.envrc
+
+# Cache files from dev tools
+.pytest_cache/
+.ruff_cache/
+.coverage
+
+# Benchmark results, datasets, etc
+data/
+experiments/*/output/
+
+# Quarto files
+experiments/*/*.html
+experiments/*/*.quarto_ipynb*
+experiments/*/report_files/
+
+# Generated documentation
+site/
