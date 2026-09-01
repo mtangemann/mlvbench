@@ -61,6 +61,7 @@ dev = [
 [project.urls]
 Homepage = "https://github.com/mtangemann/mlvbench"
 Repository = "https://github.com/mtangemann/mlvbench.git"
+Documentation = "https://mtangemann.github.io/mlvbench"
 Issues = "https://github.com/mtangemann/mlvbench/issues"
 
 [tool.pytest.ini_options]

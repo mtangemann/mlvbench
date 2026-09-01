@@ -74,7 +74,8 @@ test_loader = data_module.test_loader(batch_size=256)
 trainer.evaluate(model, test_loader, "output/example/evaluation")
 ```
 
-Have a look at the API documentation for more details (`make docs`).
+Have a look at the [API documentation](https://mtangemann.github.io/mlvbench) for more
+information.
 
 
 ## Citation
