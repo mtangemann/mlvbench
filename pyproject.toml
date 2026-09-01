@@ -7,6 +7,7 @@ authors = [
     { name = "Matthias Tangemann", email = "mtangemann@cs.toronto.edu" },
     { name = "Benjamin Lo", email = "benjamin.lo2@mail.mcgill.ca" },
 ]
+license = { file = "LICENSE" }
 requires-python = ">=3.14"
 dependencies = [
     "coloredlogs>=15.0.1",
