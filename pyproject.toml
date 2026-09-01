@@ -1,3 +1,7 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
 [project]
 name = "mlvbench"
 version = "1.0.0"
@@ -8,6 +12,11 @@ authors = [
     { name = "Benjamin Lo", email = "benjamin.lo2@mail.mcgill.ca" },
 ]
 license = { file = "LICENSE" }
+classifiers = [
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+]
 requires-python = ">=3.14"
 dependencies = [
     "coloredlogs>=15.0.1",
@@ -36,10 +45,6 @@ dependencies = [
     "xformers>=0.0.35; sys_platform == 'linux'",
 ]
 
-[build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
-
 [dependency-groups]
 dev = [
     "build>=1.6.0",
@@ -52,6 +57,11 @@ dev = [
     "twine>=7.0.0",
     "zensical>=0.0.45",
 ]
+
+[project.urls]
+Homepage = "https://github.com/mtangemann/mlvbench"
+Repository = "https://github.com/mtangemann/mlvbench.git"
+Issues = "https://github.com/mtangemann/mlvbench/issues"
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
@@ -70,6 +80,3 @@ lint.ignore = ["FIX002"]
 
 [tool.ruff.lint.pydocstyle]
 convention = "google"
-
-[tool.setuptools]
-packages = ["mlvbench"]
