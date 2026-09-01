@@ -42,11 +42,14 @@ build-backend = "hatchling.build"
 
 [dependency-groups]
 dev = [
+    "build>=1.6.0",
+    "licensecheck>=2026.0.8",
     "mkdocstrings[python]>=1.0.4",
     "pandas-stubs>=3.0.5.260730",
     "pytest>=9.0.2",
     "pytest-cov>=7.0.0",
     "ruff>=0.15.4",
+    "twine>=7.0.0",
     "zensical>=0.0.45",
 ]
 
