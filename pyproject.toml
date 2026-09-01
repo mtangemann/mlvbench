@@ -1,3 +1,7 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
 [project]
 name = "mlvbench"
 version = "1.0.0"
@@ -6,6 +10,12 @@ readme = "README.md"
 authors = [
     { name = "Matthias Tangemann", email = "mtangemann@cs.toronto.edu" },
     { name = "Benjamin Lo", email = "benjamin.lo2@mail.mcgill.ca" },
+]
+license = { file = "LICENSE" }
+classifiers = [
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
 ]
 requires-python = ">=3.14"
 dependencies = [
@@ -35,19 +45,24 @@ dependencies = [
     "xformers>=0.0.35; sys_platform == 'linux'",
 ]
 
-[build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
-
 [dependency-groups]
 dev = [
+    "build>=1.6.0",
+    "licensecheck>=2026.0.8",
     "mkdocstrings[python]>=1.0.4",
     "pandas-stubs>=3.0.5.260730",
     "pytest>=9.0.2",
     "pytest-cov>=7.0.0",
     "ruff>=0.15.4",
+    "twine>=7.0.0",
     "zensical>=0.0.45",
 ]
+
+[project.urls]
+Homepage = "https://github.com/mtangemann/mlvbench"
+Repository = "https://github.com/mtangemann/mlvbench.git"
+Documentation = "https://mtangemann.github.io/mlvbench"
+Issues = "https://github.com/mtangemann/mlvbench/issues"
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
@@ -66,6 +81,3 @@ lint.ignore = ["FIX002"]
 
 [tool.ruff.lint.pydocstyle]
 convention = "google"
-
-[tool.setuptools]
-packages = ["mlvbench"]
