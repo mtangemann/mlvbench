@@ -70,6 +70,40 @@ class ToNumpy:
         return new_sample
 
 
+class BinarizeSegmentation:
+    """Threshold the segmentation map in a sample dict to the values 0 and 1.
+
+    Non-segmentation values are passed through unchanged.
+    """
+
+    def __init__(self, threshold: int = 127):
+        """Initialize the transform.
+
+        Args:
+            threshold: Values strictly greater than the threshold are mapped to 1, all
+                other values to 0.
+        """
+        self.threshold = threshold
+
+    def __call__(
+        self,
+        sample: dict[str, str | torch.Tensor],
+    ) -> dict[str, str | torch.Tensor]:
+        """Binarize the segmentation in the sample.
+
+        Args:
+            sample: A dictionary with a "segmentation" tensor.
+
+        Returns:
+            A new dictionary where "segmentation" is a `uint8` tensor of the same shape
+                with values 0 and 1.
+        """
+        new_sample = dict(sample)
+        segmentation = sample["segmentation"]
+        new_sample["segmentation"] = (segmentation > self.threshold).to(torch.uint8)
+        return new_sample
+
+
 class Resize:
     """Resize images and segmentation maps so the shorter side equals image_size."""
 

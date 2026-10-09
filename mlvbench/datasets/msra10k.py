@@ -19,7 +19,13 @@ from mlvbench.cache import (
 from mlvbench.datasets import DataModule
 from mlvbench.download import download
 from mlvbench.models import Model
-from mlvbench.stimuli.transforms import CenterCrop, Resize, ToNumpy, ToTensor
+from mlvbench.stimuli.transforms import (
+    BinarizeSegmentation,
+    CenterCrop,
+    Resize,
+    ToNumpy,
+    ToTensor,
+)
 
 LOGGER = logging.getLogger(__name__)
 
@@ -31,7 +37,7 @@ class MSRA10KDataModule(DataModule):
     """Data module for the MSRA-10K dataset."""
 
     name = "msra10k"
-    version = "1.0.0"
+    version = "1.0.1"
 
     def __init__(self, seed: int = 0, to_numpy: bool = False) -> None:
         """Initialize the data module.
@@ -56,6 +62,7 @@ class MSRA10KDataModule(DataModule):
         """Create the train/val/test index splits."""
         transforms = [
             ToTensor(),
+            BinarizeSegmentation(),
             CenterCrop(),
             Resize(self.image_size),
         ]
@@ -86,7 +93,7 @@ class PrecomputedMSRA10KDataModule(DataModule):
     """Precomputed data module for the MSRA-10K dataset."""
 
     name = "msra10k"
-    version = "2.0.0"
+    version = "2.0.1"
 
     def __init__(self, seed: int = 0) -> None:
         """Initialize the data module.
