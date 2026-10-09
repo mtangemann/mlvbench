@@ -32,13 +32,13 @@ def test_linear_probe_parameter_count_spatial_bias():
     assert n_params == input_dim + num_patches
 
 
-def test_linear_probe_spatial_bias_initialized_from_prior():
-    """A prior tensor selects a spatial bias initialized from it."""
+def test_linear_probe_spatial_bias_initialized_from_tensor():
+    """A tensor selects a spatial bias initialized from it."""
     input_dim = 8
-    prior = torch.randn(4, 1)
-    probe = LinearProbe("block.0", input_dim, bias=prior)
+    init = torch.randn(4, 1)
+    probe = LinearProbe("block.0", input_dim, bias=init)
     assert probe.bias_type == "spatial"
-    assert torch.equal(probe.bias.detach(), prior)
+    assert torch.equal(probe.bias.detach(), init)
 
 
 def test_linear_probe_spatial_bias_requires_num_patches():

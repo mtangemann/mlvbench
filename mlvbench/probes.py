@@ -155,7 +155,7 @@ class LinearProbe(Probe):
                 - `"scalar"`: a single learnable scalar shared across all patches.
                 - `"spatial"`: a learnable per-patch bias with shape `(num_patches, 1)`,
                     initialized to zero. Requires `num_patches`.
-                - a `torch.Tensor` (a prior with shape `(N, 1)`): a per-patch bias
+                - a `torch.Tensor` with shape `(N, 1)`: a per-patch bias
                     initialized from the tensor; equivalent to `"spatial"` with
                     `num_patches = N`.
 

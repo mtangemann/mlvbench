@@ -16,7 +16,7 @@ from mlvbench.probes import Probe
 # it and refuses checkpoints it does not understand. This is distinct from the
 # `mlvbench_version` provenance stamp, which records the package version that created
 # the checkpoint and is never used for compatibility decisions.
-CHECKPOINT_FORMAT_VERSION = 1
+CHECKPOINT_FORMAT_VERSION = 2
 
 
 def _mlvbench_version() -> str:
@@ -57,7 +57,6 @@ class Model(ABC, torch.nn.Module):
         self._seed = seed
 
         self.probes: list[Probe] = []
-        self.prior: torch.Tensor | None = None
 
     @property
     @abstractmethod
@@ -303,8 +302,8 @@ class Model(ABC, torch.nn.Module):
         """Save this model's state so it can be restored with `load_model`.
 
         Stores the build configuration (so the pretrained backbone is rebuilt by name
-        via [`config`][mlvbench.models.Model.config]), the fitted prior, and all
-        attached probes. Backbone weights are *not* stored by default — they are
+        via [`config`][mlvbench.models.Model.config]) and all attached probes.
+        Backbone weights are *not* stored by default — they are
         reconstructed from the pretrained checkpoint, which keeps the file small.
 
         Each probe stores its own `name`, so a model may hold probes of different types.
@@ -321,7 +320,6 @@ class Model(ABC, torch.nn.Module):
             "mlvbench_checkpoint_format_version": CHECKPOINT_FORMAT_VERSION,
             "mlvbench_version": _mlvbench_version(),
             "config": self.config(),
-            "prior": self.prior.cpu() if self.prior is not None else None,
             "probes": [probe.serialize() for probe in self.probes],
             "state_dict": self.state_dict() if include_weights else None,
         }

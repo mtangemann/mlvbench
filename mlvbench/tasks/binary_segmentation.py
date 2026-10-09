@@ -19,7 +19,6 @@ class BinarySegmentationTask(Task):
     def __init__(self) -> None:
         """Initialize the task."""
         self.patch_size = None
-        self.prior_logits = None
 
     def configure(self, model: Model) -> None:
         """Configure the task for the given model."""
@@ -102,50 +101,7 @@ class BinarySegmentationTask(Task):
             save_predictions: The maximum number of samples for which the evaluator
                 keeps raw predictions. Set to 0 to disable.
         """
-        return BinarySegmentationEvaluator(
-            self.patch_size, self.prior_logits, save_predictions
-        )
-
-    def has_prior(self) -> bool:
-        """Return True: this task supports a spatial foreground prior."""
-        return True
-
-    def fit_prior(
-        self, train_dataloader: torch.utils.data.DataLoader, device: torch.device
-    ) -> torch.Tensor:
-        """Fit per-location foreground prior logits from the training set.
-
-        For each token position, counts how many pure patches (weight > 0) are
-        foreground across all training images and derives a logit from the resulting
-        rate. The result is stored as `self.prior_logits` with shape `(1, N, 1)`.
-
-        Args:
-            train_dataloader: A non-repeating data loader over the training set.
-            device: The device to use for the prior.
-
-        Returns:
-            The per-location prior logits with shape `(N, 1)` and dtype `float32`.
-        """
-        target_sum = None
-        weight_sum = None
-
-        for batch in train_dataloader:
-            target, weight = self.prepare_target(batch)  # (B, N, 1), (B, N, 1)
-
-            if target_sum is None:
-                N = target.shape[1]
-                target_sum = torch.zeros(N, 1, device=device)
-                weight_sum = torch.zeros(N, 1, device=device)
-
-            target_sum += (target * weight).sum(dim=0).to(device)
-            weight_sum += weight.sum(dim=0).to(device)
-
-        if target_sum is None:
-            raise RuntimeError("train_dataloader was empty; cannot fit prior.")
-
-        rate = target_sum / weight_sum.clamp(min=1.0)
-        self.prior_logits = torch.logit(rate, eps=1e-6)  # (N, 1)
-        return self.prior_logits
+        return BinarySegmentationEvaluator(self.patch_size, save_predictions)
 
 
 class BinarySegmentationEvaluator(Evaluator):
@@ -154,7 +110,6 @@ class BinarySegmentationEvaluator(Evaluator):
     def __init__(
         self,
         patch_size: int,
-        prior_logits: torch.Tensor | None = None,
         save_predictions: int = 8,
     ) -> None:
         """Initialize the evaluator.
@@ -162,15 +117,11 @@ class BinarySegmentationEvaluator(Evaluator):
         Args:
             patch_size: The patch size of the model, used to reconstruct the spatial
                 layout of patches for visualization.
-            prior_logits: Optional per-location prior logits with shape `(N, 1)` and
-                dtype `float32`. If provided, chance accuracy is computed for each
-                sample.
             save_predictions: The maximum number of samples for which to keep raw
                 predictions. Samples are taken in the order they are passed to
                 `update`. Set to 0 to disable.
         """
         self.patch_size = patch_size
-        self.prior_logits = prior_logits  # (N, 1) or None
         self.save_predictions = save_predictions
         self.results = []
         self.predictions = []
@@ -227,28 +178,14 @@ class BinarySegmentationEvaluator(Evaluator):
         weight: torch.Tensor | None = None,
     ) -> None:
         """Update with predictions and targets for a single sample."""
-        prior_logits = self.prior_logits
-
         if weight is not None:
             mask = weight.squeeze(-1) > 0
             prediction = prediction[mask]
             target = target[mask]
-            if self.prior_logits is not None:
-                prior_logits = prior_logits[mask]
 
         bce = F.binary_cross_entropy_with_logits(prediction, target).item()
         accuracy = ((prediction > 0.0) == (target > 0.5)).float().mean().item()
         entry = {"__key__": key, "bce": bce, "accuracy": accuracy}
-
-        if prior_logits is not None:
-            entry["prior_accuracy"] = (
-                ((prior_logits > 0.0) == (target > 0.5)).float().mean().item()
-            )
-            entry["prior_bce"] = F.binary_cross_entropy_with_logits(
-                prior_logits, target
-            ).item()
-            entry["ig"] = entry["prior_bce"] - bce
-            entry["ige"] = entry["ig"] / entry["prior_bce"]
 
         self.results.append(entry)
 
@@ -260,9 +197,4 @@ class BinarySegmentationEvaluator(Evaluator):
             "bce": df["bce"].mean(),
             "accuracy": df["accuracy"].mean(),
         }
-        if "prior_accuracy" in df.columns:
-            summary["prior_accuracy"] = df["prior_accuracy"].mean()
-            summary["prior_bce"] = df["prior_bce"].mean()
-            summary["ig"] = df["ig"].mean()
-            summary["ige"] = df["ige"].mean()
         return summary, df, self.predictions
