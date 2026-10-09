@@ -16,9 +16,16 @@ class BinarySegmentationTask(Task):
     Predict whether each patch belongs to the foreground (segmentation > 0).
     """
 
-    def __init__(self) -> None:
-        """Initialize the task."""
-        self.patch_size = None
+    def __init__(self, patch_size: int | None = None) -> None:
+        """Initialize the task.
+
+        Args:
+            patch_size: The patch size of the model. Alternatively, this can be
+                specified later by calling `configure`. The
+                [`Trainer`](mlvbench.trainer.Trainer) always calls `configure`, so the
+                the patch size doesn't have to be specified for probe training.
+        """
+        self.patch_size = patch_size
 
     def configure(self, model: Model) -> None:
         """Configure the task for the given model."""
@@ -39,6 +46,12 @@ class BinarySegmentationTask(Task):
                 otherwise, and weight has shape `(B, N, 1)` and dtype `float32` with 0.0
                 for patches that contain more than one segment label and 1.0 otherwise.
         """
+        if self.patch_size is None:
+            raise RuntimeError(
+                "The patch size is not set. Pass `patch_size` to the constructor or "
+                "call `configure` first."
+            )
+
         segmentation = batch["segmentation"]
 
         assert segmentation.shape[-2] % self.patch_size == 0
@@ -101,6 +114,12 @@ class BinarySegmentationTask(Task):
             save_predictions: The maximum number of samples for which the evaluator
                 keeps raw predictions. Set to 0 to disable.
         """
+        if self.patch_size is None:
+            raise RuntimeError(
+                "The patch size is not set. Pass `patch_size` to the constructor or "
+                "call `configure` first."
+            )
+
         return BinarySegmentationEvaluator(self.patch_size, save_predictions)
 
 
