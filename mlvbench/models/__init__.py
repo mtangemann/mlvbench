@@ -176,17 +176,12 @@ def load_model(
     if checkpoint["state_dict"] is not None:
         model.load_state_dict(checkpoint["state_dict"])
 
-    prior = checkpoint["prior"]
-    if prior is not None:
-        prior = prior.to(device)
-
     probes = [
         build_probe(**probe_state, probe_types=probe_types).to(device)
         for probe_state in checkpoint["probes"]
     ]
 
     model.probes = probes
-    model.prior = prior
     return model
 
 

@@ -1,7 +1,6 @@
 """Task interface."""
 
 from abc import ABC, abstractmethod
-from collections.abc import Iterable
 from typing import Any
 
 import pandas as pd
@@ -13,8 +12,7 @@ from mlvbench.models._base import Model
 class Task(ABC):
     """Base class for tasks.
 
-    A task specifies the prediction target, the loss function and the evaluator for
-    fitting probes.
+    A task specifies the prediction target, the loss function and the evaluator.
     """
 
     def configure(self, model: Model) -> None:  # noqa: B027
@@ -75,23 +73,6 @@ class Task(ABC):
             save_predictions: The maximum number of samples for which the evaluator
                 keeps raw predictions. Set to 0 to disable.
         """
-
-    def has_prior(self) -> bool:
-        """Return True if this task supports fitting a prior."""
-        return False
-
-    def fit_prior(
-        self, train_dataloader: Iterable, device: torch.device
-    ) -> torch.Tensor:
-        """Fit the prior from the training data.
-
-        Called by the trainer before probe training when has_prior() returns True.
-
-        Args:
-            train_dataloader: A non-repeating data loader over the training set.
-            device: The device to use for the prior.
-        """
-        raise NotImplementedError
 
 
 class Evaluator(ABC):

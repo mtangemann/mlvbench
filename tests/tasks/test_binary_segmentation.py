@@ -1,7 +1,5 @@
 """Test for the binary segmentation task."""
 
-import types
-
 import pytest
 import torch
 import torch.nn.functional as F
@@ -36,8 +34,7 @@ class TestBinarySegmentationTask:
     def test_prepare_target_shapes(self):
         """Targets are (B, N, 1) and weights are (B, N, 1)."""
         B, H, W, P = 2, 4, 4, 14
-        task = BinarySegmentationTask()
-        task.configure(types.SimpleNamespace(patch_size=P))
+        task = BinarySegmentationTask(patch_size=P)
         batch = _make_batch(B, H, W, P, lambda b, y, x: 0)
 
         targets, weights = task.prepare_target(batch)
@@ -48,8 +45,7 @@ class TestBinarySegmentationTask:
     def test_prepare_target_all_background(self):
         """Segmentation all zeros → targets are all 0."""
         B, H, W, P = 1, 2, 2, 14
-        task = BinarySegmentationTask()
-        task.configure(types.SimpleNamespace(patch_size=P))
+        task = BinarySegmentationTask(patch_size=P)
         batch = _make_batch(B, H, W, P, lambda b, y, x: 0)
 
         targets, _ = task.prepare_target(batch)
@@ -58,8 +54,7 @@ class TestBinarySegmentationTask:
     def test_prepare_target_all_foreground(self):
         """Segmentation all nonzero → targets are all 1."""
         B, H, W, P = 1, 2, 2, 14
-        task = BinarySegmentationTask()
-        task.configure(types.SimpleNamespace(patch_size=P))
+        task = BinarySegmentationTask(patch_size=P)
         batch = _make_batch(B, H, W, P, lambda b, y, x: 1)
 
         targets, _ = task.prepare_target(batch)
@@ -68,8 +63,7 @@ class TestBinarySegmentationTask:
     def test_prepare_target_mixed(self):
         """Patches with label > 0 get target 1, patches with label 0 get target 0."""
         B, H, W, P = 1, 2, 2, 14
-        task = BinarySegmentationTask()
-        task.configure(types.SimpleNamespace(patch_size=P))
+        task = BinarySegmentationTask(patch_size=P)
         # Row 0 (y=0): label 0 → background. Row 1 (y=1): label 1 → foreground.
         batch = _make_batch(B, H, W, P, lambda b, y, x: y)
 
@@ -80,8 +74,7 @@ class TestBinarySegmentationTask:
     def test_pure_patches_have_weight_one(self):
         """Patches with a single segment label get weight 1."""
         B, H, W, P = 1, 2, 2, 14
-        task = BinarySegmentationTask()
-        task.configure(types.SimpleNamespace(patch_size=P))
+        task = BinarySegmentationTask(patch_size=P)
         batch = _make_batch(B, H, W, P, lambda b, y, x: y)
 
         _, weights = task.prepare_target(batch)
@@ -95,10 +88,25 @@ class TestBinarySegmentationTask:
         segmentation[0, 0, P // 2 :, :] = 1
         batch = {"segmentation": segmentation}
 
-        task = BinarySegmentationTask()
-        task.configure(types.SimpleNamespace(patch_size=P))
+        task = BinarySegmentationTask(patch_size=P)
         _, weights = task.prepare_target(batch)
         assert weights[0, 0, 0] == 0.0
+
+
+    def test_prepare_target_requires_patch_size(self):
+        """Preparing targets without a patch size raises an error."""
+        task = BinarySegmentationTask()
+        batch = _make_batch(1, 2, 2, 14, lambda b, y, x: 0)
+
+        with pytest.raises(RuntimeError, match="patch size"):
+            task.prepare_target(batch)
+
+    def test_get_evaluator_requires_patch_size(self):
+        """Getting an evaluator without a patch size raises an error."""
+        task = BinarySegmentationTask()
+
+        with pytest.raises(RuntimeError, match="patch size"):
+            task.get_evaluator()
 
 
 class TestBinarySegmentationEvaluator:

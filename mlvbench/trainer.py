@@ -180,51 +180,22 @@ class ProbeTrainer:
         self.data_module.prepare_data()
         self.data_module.setup()
 
-        prior = self._fit_prior(model)
-        probes, throughput = self._fit_probes(model, layers, prior)
+        probes, throughput = self._fit_probes(model, layers)
         model.probes = probes
-        model.prior = prior
 
         return throughput
-
-    def _fit_prior(self, model: Model) -> torch.Tensor | None:
-        """Fit the prior to the training data.
-
-        Returns:
-            The fitted prior, or None if the task does not support a prior.
-        """
-        if not self.task.has_prior():
-            return None
-
-        LOGGER.info("Fitting prior...")
-        start_time = time.perf_counter()
-
-        train_loader = self.data_module.train_dataloader(
-            batch_size = self.batch_size,
-            num_workers = self.num_workers,
-            device=model.device,
-            repeat=False,
-        )
-
-        prior = self.task.fit_prior(train_loader, model.device)
-
-        duration = time.perf_counter() - start_time
-        LOGGER.info("Fitting prior completed in %.2fs", duration)
-
-        return prior
 
     def _fit_probes(
         self,
         model: Model,
         layers: list[str],
-        prior: torch.Tensor | None,
     ) -> tuple[list[Probe], list[dict[str, Any]]]:
         """Fit the probes to the training data."""
         LOGGER.info("Fitting probes...")
         start_time = time.perf_counter()
 
         model.eval()
-        probes = self._setup_probes(model, layers, prior)
+        probes = self._setup_probes(model, layers)
         device = model.device
         step = 0
 
@@ -455,7 +426,6 @@ class ProbeTrainer:
         self,
         model: Model,
         layers: list[str],
-        prior: torch.Tensor | None,
     ) -> list[_ProbeWithTrainingState]:
         """Set up one probe per layer / lr / weight decay combination."""
         probes = []
@@ -463,14 +433,11 @@ class ProbeTrainer:
             for lr in self.lr:
                 for weight_decay in self.weight_decay:
                     metadata = {"lr": lr, "weight_decay": weight_decay, "step": 0}
-                    # Clone the prior to avoid modifying the original tensor during
-                    # probe training.
-                    bias = prior.clone() if prior is not None else "scalar"
                     probe = build_probe(
                         self.probe,
                         layer,
                         model.embed_dim,
-                        bias=bias,
+                        bias="scalar",
                         metadata=metadata,
                         probe_types=self.probe_types,
                     ).to(model.device)
