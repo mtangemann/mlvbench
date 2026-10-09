@@ -2,6 +2,8 @@
 
 This repository contains the code for the paper "[Vision Transformers Learn Gestalt-Like Figure-Ground Cues from Natural Images](https://arxiv.org/abs/2607.08932)" and provides reusable components for testing mid-level representations in Vision Transformers.
 
+**You are looking at the latest development version of mlvbench. Switch to [v1.0.0](https://github.com/mtangemann/mlvbench/tree/v1.0.0) for the latest stable release.**
+
 
 ## Prerequisites
 Clone this repository and install the Python dependencies:
