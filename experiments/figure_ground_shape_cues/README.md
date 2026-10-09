@@ -1,5 +1,7 @@
 # Figure Ground Shape Cues
 
+**You are looking at the latest development version of mlvbench. Switch to [v1.0.0](https://github.com/mtangemann/mlvbench/releases/tag/v1.0.0) for the code used in the arXiv preprint.**
+
 ## Usage
 ```bash
 # Local debug run
