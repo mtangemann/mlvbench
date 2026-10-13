@@ -233,22 +233,36 @@ class TestPrecomputedDataset:
         dataset = PrecomputedDataset(dataset_path)
         assert len(dataset) == 4
 
-    def test_no_feature_map_returns_all_keys(self, dataset_path: Path):
+    def test_no_features_returns_all_keys(self, dataset_path: Path):
         dataset = PrecomputedDataset(dataset_path)
         sample = dataset[0]
         assert set(sample.keys()) == {"__key__", "image_consistent", "segmentation"}
 
-    def test_feature_map_renames_keys(self, dataset_path: Path):
+    def test_features_list_selects_keys(self, dataset_path: Path):
+        dataset = PrecomputedDataset(dataset_path, features=["segmentation"])
+        sample = dataset[0]
+        assert set(sample.keys()) == {"__key__", "segmentation"}
+        assert set(dataset.buffers) == {"segmentation"}
+
+    def test_features_list_values_match_original_data(self, dataset_path: Path):
+        dataset_original = PrecomputedDataset(dataset_path)
+        dataset_selected = PrecomputedDataset(dataset_path, features=["segmentation"])
+        assert torch.equal(
+            dataset_original[2]["segmentation"], dataset_selected[2]["segmentation"]
+        )
+
+    def test_features_dict_renames_keys(self, dataset_path: Path):
         dataset = PrecomputedDataset(
-            dataset_path, feature_map={"image_consistent": "image"}
+            dataset_path, features={"image": "image_consistent"}
         )
         sample = dataset[0]
         assert set(sample.keys()) == {"__key__", "image"}
+        assert set(dataset.buffers) == {"image_consistent"}
 
-    def test_feature_map_values_match_original_data(self, dataset_path: Path):
+    def test_features_dict_values_match_original_data(self, dataset_path: Path):
         dataset_original = PrecomputedDataset(dataset_path)
         dataset_mapped = PrecomputedDataset(
-            dataset_path, feature_map={"image_consistent": "image"}
+            dataset_path, features={"image": "image_consistent"}
         )
         image_original = dataset_original[2]["image_consistent"]
         image_mapped = dataset_mapped[2]["image"]
@@ -257,10 +271,33 @@ class TestPrecomputedDataset:
     def test_multiple_keys_remapped(self, dataset_path: Path):
         dataset = PrecomputedDataset(
             dataset_path,
-            feature_map={
-                "image_consistent": "image",
-                "segmentation": "label",
+            features={
+                "image": "image_consistent",
+                "label": "segmentation",
             },
         )
         sample = dataset[0]
         assert set(sample.keys()) == {"__key__", "image", "label"}
+
+    @pytest.mark.parametrize("mmap", [True, False])
+    def test_shared_buffer_loaded_once(self, dataset_path: Path, mmap: bool):
+        dataset = PrecomputedDataset(
+            dataset_path,
+            features={
+                "image": "image_consistent",
+                "image_copy": "image_consistent",
+                "segmentation": "segmentation",
+            },
+            mmap=mmap,
+        )
+        assert set(dataset.buffers) == {"image_consistent", "segmentation"}
+        sample = dataset[1]
+        assert set(sample.keys()) == {"__key__", "image", "image_copy", "segmentation"}
+        assert torch.equal(sample["image"], sample["image_copy"])
+
+    @pytest.mark.parametrize(
+        "features", [["missing"], {"image": "missing"}]
+    )
+    def test_unknown_buffer_raises(self, dataset_path: Path, features):
+        with pytest.raises(ValueError, match="missing"):
+            PrecomputedDataset(dataset_path, features=features)

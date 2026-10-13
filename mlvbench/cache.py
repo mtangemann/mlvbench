@@ -254,17 +254,19 @@ class PrecomputedDataset(Dataset):
     def __init__(
         self,
         path: Path,
-        feature_map: dict[str, str] | None = None,
+        features: list[str] | dict[str, str] | None = None,
         mmap: bool = True,
     ):
         """Initialize the dataset.
 
         Args:
             path: Path to the precomputed dataset directory.
-            feature_map: Optional mapping from stored feature names to output
-                feature names, e.g. `{"image_consistent": "image"}`.  When
-                provided, only the keys present in the map are loaded; all
-                other stored features are ignored.
+            features: Optional selection of the features to load. If None (default),
+                all stored features are loaded under their stored names. If a list,
+                only the given stored features are loaded. If a dict, it maps the
+                feature names in the returned samples to the names of the stored
+                buffers, e.g. `{"image": "image_reversed"}`. The same buffer may be
+                used for multiple features, but is loaded only once.
             mmap: If True (default), buffers are memory-mapped from disk. If
                 False, the entire arrays are loaded into RAM at construction
                 time.
@@ -273,14 +275,24 @@ class PrecomputedDataset(Dataset):
             metadata = json.load(f)
 
         self.mmap = mmap
+        self.features = features
+
+        if features is None:
+            self.feature_buffers = {key: key for key in metadata}
+        elif isinstance(features, dict):
+            self.feature_buffers = dict(features)
+        else:
+            self.feature_buffers = {key: key for key in features}
+
+        missing = set(self.feature_buffers.values()) - set(metadata)
+        if missing:
+            raise ValueError(
+                f"Unknown buffers: {sorted(missing)} (available: {sorted(metadata)})"
+            )
+
         self.buffers = dict()
-        for key, info in metadata.items():
-            if feature_map is not None:
-                if key not in feature_map:
-                    continue
-                out_key = feature_map[key]
-            else:
-                out_key = key
+        for key in dict.fromkeys(self.feature_buffers.values()):
+            info = metadata[key]
             buffer = np.memmap(
                 path / f"{key}.memmap",
                 dtype=info["dtype"],
@@ -290,7 +302,7 @@ class PrecomputedDataset(Dataset):
             if not mmap:
                 buffer = torch.from_numpy(np.array(buffer))
                 buffer = rearrange(buffer, "B H W C -> B C H W")
-            self.buffers[out_key] = buffer
+            self.buffers[key] = buffer
 
         if (path / "keys").exists():
             with open(path / "keys", "r") as f:
@@ -312,7 +324,8 @@ class PrecomputedDataset(Dataset):
         """
         sample = dict()
 
-        for key, buffer in self.buffers.items():
+        for key, buffer_name in self.feature_buffers.items():
+            buffer = self.buffers[buffer_name]
             if isinstance(buffer, torch.Tensor):
                 sample[key] = buffer[index]
             else:
