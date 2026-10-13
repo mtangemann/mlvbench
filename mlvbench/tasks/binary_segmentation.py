@@ -6,6 +6,7 @@ import pandas as pd
 import torch
 import torch.nn.functional as F
 
+from mlvbench.metrics import intersection_over_union
 from mlvbench.models._base import Model
 from mlvbench.tasks._base import Evaluator, Task
 
@@ -202,9 +203,23 @@ class BinarySegmentationEvaluator(Evaluator):
             prediction = prediction[mask]
             target = target[mask]
 
+        prediction_binary = prediction > 0.0
+        target_binary = target > 0.5
+
         bce = F.binary_cross_entropy_with_logits(prediction, target).item()
-        accuracy = ((prediction > 0.0) == (target > 0.5)).float().mean().item()
-        entry = {"__key__": key, "bce": bce, "accuracy": accuracy}
+        accuracy = (prediction_binary == target_binary).float().mean().item()
+        iou_foreground = intersection_over_union(prediction_binary, target_binary)
+        iou_background = intersection_over_union(~prediction_binary, ~target_binary)
+        miou = (iou_foreground + iou_background) / 2
+
+        entry = {
+            "__key__": key,
+            "bce": bce,
+            "accuracy": accuracy,
+            "iou_foreground": iou_foreground,
+            "iou_background": iou_background,
+            "miou": miou,
+        }
 
         self.results.append(entry)
 
@@ -215,5 +230,8 @@ class BinarySegmentationEvaluator(Evaluator):
             "loss": df["bce"].mean(),
             "bce": df["bce"].mean(),
             "accuracy": df["accuracy"].mean(),
+            "iou_foreground": df["iou_foreground"].mean(),
+            "iou_background": df["iou_background"].mean(),
+            "miou": df["miou"].mean(),
         }
         return summary, df, self.predictions
