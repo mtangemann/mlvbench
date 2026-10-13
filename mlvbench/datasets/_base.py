@@ -373,8 +373,8 @@ class OnDeviceDataLoader:
         for indices in self.sampler:
             index_tensor = torch.tensor(indices, device=self.device)
             sample = {
-                key: buffer[index_tensor]
-                for key, buffer in self.dataset.buffers.items()
+                key: self.dataset.buffers[buffer_name][index_tensor]
+                for key, buffer_name in self.dataset.feature_buffers.items()
             }
             sample["__key__"] = [self.dataset.keys[i] for i in indices]
             yield sample

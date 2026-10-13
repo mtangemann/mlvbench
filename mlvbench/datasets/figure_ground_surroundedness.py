@@ -24,10 +24,10 @@ class FigureGroundSurroundednessDataModule(ProceduralDataModule):
 
     # All test subsets are views onto the same generated test split and differ only in
     # the image variant they read.
-    _TEST_FEATURE_MAPS = {
+    _TEST_FEATURES = {
         "test": {"image": "image", "segmentation": "segmentation"},
-        "test_reversed": {"image_reversed": "image", "segmentation": "segmentation"},
-        "test_split": {"image_split": "image", "segmentation": "segmentation"},
+        "test_reversed": {"image": "image_reversed", "segmentation": "segmentation"},
+        "test_split": {"image": "image_split", "segmentation": "segmentation"},
     }
 
     def __init__(self, seed: int = 0):
@@ -97,14 +97,14 @@ class FigureGroundSurroundednessDataModule(ProceduralDataModule):
 
     def subsets(self) -> list[str]:
         """Return the names of all available subsets."""
-        return ["train", "val", *self._TEST_FEATURE_MAPS]
+        return ["train", "val", *self._TEST_FEATURES]
 
     def test_dataset(self, subset: str = "test") -> PrecomputedDataset:
         """Return the requested test split (standard, reversed, or figure-split)."""
-        if subset not in self._TEST_FEATURE_MAPS:
+        if subset not in self._TEST_FEATURES:
             raise ValueError(f"Unknown test subset: {subset}")
         return PrecomputedDataset(
             self._path / "test",
-            feature_map=self._TEST_FEATURE_MAPS[subset],
+            features=self._TEST_FEATURES[subset],
             mmap=False,
         )
