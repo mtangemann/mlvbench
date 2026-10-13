@@ -146,6 +146,50 @@ class TestBinarySegmentationEvaluator:
         summary, _, _ = evaluator.finalize()
         assert summary["accuracy"] == 0.5
 
+    def test_iou(self):
+        """Foreground, background and mean IoU are computed from thresholded logits."""
+        # Foreground: intersection 1 (patch 0), union 3 (patches 0, 1, 2).
+        # Background: intersection 1 (patch 3), union 3 (patches 1, 2, 3).
+        predictions = torch.tensor([[1.0, 1.0, -1.0, -1.0]])
+        targets = torch.tensor([[1.0, 0.0, 1.0, 0.0]])
+
+        evaluator = BinarySegmentationEvaluator(patch_size=1, save_predictions=0)
+        evaluator.update({"__key__": ["sample0"]}, predictions, targets)
+        summary, results, _ = evaluator.finalize()
+
+        assert summary["iou_foreground"] == pytest.approx(1 / 3)
+        assert summary["iou_background"] == pytest.approx(1 / 3)
+        assert summary["miou"] == pytest.approx(1 / 3)
+        assert {"iou_foreground", "iou_background", "miou"} <= set(results.columns)
+
+    def test_iou_foreground_and_background_differ(self):
+        """The mean IoU averages foreground and background IoU."""
+        # Foreground: intersection 1, union 2. Background: intersection 2, union 3.
+        predictions = torch.tensor([[1.0, 1.0, -1.0, -1.0]])
+        targets = torch.tensor([[1.0, 0.0, 0.0, 0.0]])
+
+        evaluator = BinarySegmentationEvaluator(patch_size=1, save_predictions=0)
+        evaluator.update({"__key__": ["sample0"]}, predictions, targets)
+        summary, _, _ = evaluator.finalize()
+
+        assert summary["iou_foreground"] == pytest.approx(1 / 2)
+        assert summary["iou_background"] == pytest.approx(2 / 3)
+        assert summary["miou"] == pytest.approx((1 / 2 + 2 / 3) / 2)
+
+    def test_weight_zero_excludes_patches_from_iou(self):
+        """Patches with weight 0 are excluded from the IoU metrics."""
+        predictions = torch.tensor([[1.0, -1.0, 1.0]])
+        targets = torch.tensor([[1.0, 0.0, 0.0]])
+        weights = torch.tensor([[1.0, 1.0, 0.0]])  # ignore the wrong patch 2
+
+        evaluator = BinarySegmentationEvaluator(patch_size=1, save_predictions=0)
+        evaluator.update({"__key__": ["sample0"]}, predictions, targets, weights)
+        summary, _, _ = evaluator.finalize()
+
+        assert summary["iou_foreground"] == 1.0
+        assert summary["iou_background"] == 1.0
+        assert summary["miou"] == 1.0
+
     def test_weight_zero_excludes_patches_from_metrics(self):
         """Patches with weight 0 are excluded from BCE and accuracy."""
         # Two patches: patch 0 is correct (weight 1), patch 1 is wrong (weight 0).
