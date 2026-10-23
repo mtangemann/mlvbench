@@ -5,13 +5,13 @@ import logging
 import shutil
 import subprocess
 import typing
-from datetime import date, datetime
+from datetime import datetime
 from pathlib import Path
 
 import coloredlogs
 import submitit
 import yaml
-from experiment import Condition, Config, run, warmup
+from experiment import Condition, Config, run_baselines, run_model, warmup
 from tabulate import tabulate
 
 from mlvbench.models import list_models
@@ -48,6 +48,7 @@ ARGS = parser.parse_args()
 SLURM = not ARGS.debug and submitit.AutoExecutor.which() == "slurm"
 if not SLURM:
     print("SLURM not found; running jobs locally.")
+    coloredlogs.install(fmt="%(asctime)s %(name)s %(levelname)s %(message)s")
 
 EXECUTOR = submitit.AutoExecutor(
     folder=ARGS.workspace / "slurm",
@@ -156,6 +157,17 @@ def get_status() -> dict[str, dict[str, str]]:
             "reason": warmup_job["reason"],
         }
 
+    baselines_job = active_jobs.get(str(ARGS.workspace / "<baselines>"), None)
+    if baselines_job is not None:
+        status["<baselines>"] = {
+            "model": "<baselines>",
+            "weights": "-",
+            "condition": "-",
+            "slurm_id": baselines_job["slurm_id"],
+            "state": baselines_job["state"],
+            "reason": baselines_job["reason"],
+        }
+
     for config in CONFIGS:
         output_path = get_output_path(ARGS.workspace, config)
         active_job = active_jobs.get(str(output_path))
@@ -260,6 +272,40 @@ if ARGS.warmup and SLURM:
         warmup_job.wait()
     submitted_jobs += 1
 
+if warmup_job is not None and not ARGS.debug:
+    warmup_dependency = {"dependency": f"afterok:{warmup_job.job_id}"}
+else:
+    warmup_dependency = {}
+
+
+# -------------------------------------------------------------------------------------
+# Baselines
+# -------------------------------------------------------------------------------------
+
+# To figure out which baselines to run we need to know all input and patch sizes, which
+# currently means loading all model checkpoints. Actually running the baselines is
+# cheap, so we just evaluate everything for each launch.
+
+def run_baselines_all() -> None:
+    for config in CONFIGS:
+        run_baselines(config, ARGS.workspace / "results")
+
+
+if SLURM:
+    EXECUTOR.update_parameters(
+        slurm_additional_parameters={
+            **warmup_dependency,
+            "comment": str(ARGS.workspace / "<baselines>"),
+        }
+    )
+    baselines_job = EXECUTOR.submit(run_baselines_all)
+    if ARGS.debug:
+        baselines_job.wait()
+    submitted_jobs += 1
+
+else:
+    run_baselines_all()
+
 
 # -------------------------------------------------------------------------------------
 # Run
@@ -274,15 +320,16 @@ EXECUTOR.update_parameters(
     stderr_to_stdout=True,
 )
 
-def run_single(config: Config, output_path: Path) -> None:
+def run_single(config: Config, workspace: Path) -> None:
     # The job owns all outputs below its directory (the trained probe and all
     # evaluations), so any previous outputs are removed before rerunning it.
+    output_path = get_output_path(workspace, config)
     if output_path.exists():
         shutil.rmtree(output_path)
     output_path.mkdir(parents=True)
 
     try:
-        run(config, output_path)
+        run_model(config, output_path)
 
     except Exception as error:
         with open(output_path / "done", "w") as f:
@@ -299,8 +346,6 @@ def run_single(config: Config, output_path: Path) -> None:
 # works) and, unlike --debug, it does not drop into a post-mortem debugger. A failing
 # run is marked "failed" (by run_single) and execution continues.
 if not SLURM:
-    coloredlogs.install(fmt="%(asctime)s %(name)s %(levelname)s %(message)s")
-
     status = get_status()
     submit_states = ["ready", "failed"] if ARGS.retry else ["ready"]
 
@@ -313,16 +358,11 @@ if not SLURM:
 
         LOGGER.info("Running %s ...",  relative_path)
         try:
-            run_single(config, output_path)
+            run_single(config, ARGS.workspace)
         except Exception:
             LOGGER.exception("Run failed: %s", relative_path)
 
     exit()
-
-if warmup_job is not None and not ARGS.debug:
-    warmup_dependency = {"dependency": f"afterok:{warmup_job.job_id}"}
-else:
-    warmup_dependency = {}
 
 status = get_status()
 submit_states = ["ready", "failed"] if ARGS.retry else ["ready"]
@@ -338,7 +378,7 @@ for config in CONFIGS:
         slurm_additional_parameters={**warmup_dependency, "comment": str(output_path)}
     )
 
-    job = EXECUTOR.submit(run_single, config, output_path)
+    job = EXECUTOR.submit(run_single, config, ARGS.workspace)
     if ARGS.debug:
         job.wait()
 

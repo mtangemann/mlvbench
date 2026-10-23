@@ -4,16 +4,22 @@ import json
 import logging
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Literal
+from typing import Iterable, Literal
+
+import pandas as pd
+import torch
+from baselines import Baseline, iter_baselines
 
 from mlvbench.datasets import (
+    DataModule,
     FigureGroundConvexityDataModule,
     FigureGroundSurroundednessDataModule,
     FigureGroundSymmetryDataModule,
     PrecomputedMSRA10KDataModule,
 )
 from mlvbench.infrastructure import resolve_layers, save_metadata, save_model_info
-from mlvbench.models import build_model
+from mlvbench.models import Model, build_model
+from mlvbench.tasks import BinarySegmentationTask
 from mlvbench.trainer import ProbeTrainer
 
 LOGGER = logging.getLogger(__name__)
@@ -68,8 +74,8 @@ def warmup(config: Config) -> None:
         data_module.prepare_data()
 
 
-def run(config: Config, output_path: Path) -> None:
-    """Run the experiment for a given configuration.
+def run_model(config: Config, output_path: Path) -> None:
+    """Train and evaluate the probe for a single configuration.
 
     Args:
         config: The configuration to run.
@@ -154,6 +160,111 @@ def run(config: Config, output_path: Path) -> None:
     LOGGER.info("Done.")
 
 
+def run_baselines(config: Config, results_path: Path) -> None:
+    """Evaluate all baselines for a single configuration.
+
+    Args:
+        config: The configuration to run. All baselines will use the same input size and
+            patch size as the specified model.
+        results_path: The root directory for results (`<workspace>/results`).
+    """
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+
+    model = build_model(config.model, pretrained=False, seed=config.model_seed)
+
+    for baseline in iter_baselines(model.input_size, model.patch_size):
+        # Roughly mirror the naming pattern of timm checkpoints.
+        name = f"baseline_{baseline.name}_patch{model.patch_size}_{model.input_size}"
+        output_path = results_path / name / config.condition
+
+        if (output_path / "done").exists():
+            LOGGER.info(
+                "Skipping baseline '%s' (%s): already done", name, config.condition
+            )
+            continue
+
+        LOGGER.info("Evaluating baseline '%s' (%s) ...", name, config.condition)
+
+        task = BinarySegmentationTask()
+        task.configure(baseline)
+        baseline.fit(_build_data_module(config.condition, baseline))
+
+        for eval_condition in list(_DATA_MODULES):
+            data_module = _build_data_module(eval_condition, baseline)
+            test_subsets = [
+                subset
+                for subset in data_module.subsets()
+                if subset.startswith("test")
+            ]
+            for subset in test_subsets:
+                LOGGER.info("  '%s/%s' ...", eval_condition, subset)
+                subset_path = output_path / "evaluations" / f"{eval_condition}_{subset}"
+                test_loader = data_module.test_dataloader(
+                    subset=subset, batch_size=config.batch_size, device=device
+                )
+                _evaluate_baseline_on_subset(
+                    baseline, task, test_loader, subset_path, config.save_predictions
+                )
+
+        output_path.mkdir(parents=True, exist_ok=True)
+        with open(output_path / "done", "w") as file:
+            file.write("completed\n")
+
+
+# TODO Reduce duplicated evaluation code (also in ProbeTrainer). Baselines and models...
+#      are different, so the evaluation code is not 100% the same. But it should be
+#      possible to substantially reduce duplication.
+def _evaluate_baseline_on_subset(
+    baseline: Baseline,
+    task: BinarySegmentationTask,
+    dataloader: Iterable[dict],
+    output_path: Path,
+    save_predictions: int,
+) -> None:
+    """Evaluate a baseline on a single subset and write the result files.
+
+    Writes the output in the same format as
+    [`ProbeTrainer.evaluate`][mlvbench.trainer.ProbeTrainer.evaluate], but with a
+    `baseline` column instead of `layer` and probe metadata.
+    """
+    evaluator = task.get_evaluator(save_predictions=save_predictions)
+
+    for batch in dataloader:
+        target, weight = task.prepare_target(batch)
+        prediction = baseline.predict(batch, target)
+        evaluator.update(batch, prediction, target, weight)
+
+    summary, results, predictions = evaluator.finalize()
+
+    results["baseline"] = baseline.name
+
+    nested: dict[str, dict] = {}
+    for record in predictions:
+        key = record["__key__"]
+        nested[key] = {k: v for k, v in record.items() if k != "prediction"}
+        nested[key]["predictions"] = [
+            {"baseline": baseline.name, "prediction": record["prediction"]}
+        ]
+
+    output_path.mkdir(parents=True, exist_ok=True)
+    results.to_parquet(output_path / "results.parquet")
+    pd.DataFrame([{"baseline": baseline.name, **summary}]).to_csv(
+        output_path / "summary.csv", index=False
+    )
+    torch.save(nested, output_path / "predictions.pt")
+
+
+def _build_data_module(
+    condition: Condition,
+    model_or_baseline: Model | Baseline,
+) -> DataModule:
+    data_module = _DATA_MODULES[condition]()
+    data_module.configure(model_or_baseline)
+    data_module.prepare_data()
+    data_module.setup()
+    return data_module
+
+
 if __name__ == "__main__":
     import coloredlogs
     import tyro
@@ -171,4 +282,4 @@ if __name__ == "__main__":
     output_path = config.output_path
     config = Config(**{k: v for k, v in asdict(config).items() if k != "output_path"})
 
-    run(config, output_path)
+    run_model(config, output_path)
