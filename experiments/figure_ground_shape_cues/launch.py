@@ -95,6 +95,7 @@ def load_configs() -> list[Config]:
     models = resolve_models(launch_config["models"])
     base_overrides = launch_config.get("base", {})
     model_overrides = launch_config.get("model_overrides", {})
+    random_baselines = launch_config.get("random_baselines", False)
 
     configs = []
 
@@ -102,6 +103,11 @@ def load_configs() -> list[Config]:
         for condition in conditions:
             overrides = {**base_overrides, **model_overrides.get(model, {})}
             configs.append(Config(model=model, condition=condition, **overrides))
+
+            if random_baselines:
+                configs.append(Config(
+                    model=model, condition=condition, **overrides, pretrained=False
+                ))
 
     return configs
 

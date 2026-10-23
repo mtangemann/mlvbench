@@ -2,3 +2,5 @@
 
 models:
   - standard25
+
+random_baselines: True
