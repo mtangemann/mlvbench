@@ -20,14 +20,19 @@ class FigureGroundConvexityDataModule(ProceduralDataModule):
     """
 
     name = "figure_ground_convexity"
-    version = "1.0.0"
+    version = "2.0.0-dev"
 
     # All test subsets are views onto the same generated test split and differ only in
-    # the image variant they read.
+    # the image variant they read. `texture_segmentation` is the region map that was
+    # used for texturizing the image.
     _TEST_FEATURES = {
         "test": {"image": "image", "segmentation": "segmentation"},
         "test_reversed": {"image": "image_reversed", "segmentation": "segmentation"},
-        "test_split": {"image": "image_split", "segmentation": "segmentation"},
+        "test_split": {
+            "image": "image_split",
+            "segmentation": "segmentation",
+            "texture_segmentation": "segmentation_split",
+        },
     }
 
     def __init__(self, seed: int = 0):
@@ -87,6 +92,7 @@ class FigureGroundConvexityDataModule(ProceduralDataModule):
             )
             image_split = texturize(split_region_map, textures, rng=texture_rng)
             sample["image_split"] = image_split
+            sample["segmentation_split"] = split_region_map
 
         return sample
 
