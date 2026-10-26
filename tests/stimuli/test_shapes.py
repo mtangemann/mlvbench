@@ -4,6 +4,7 @@ import numpy as np
 import pytest
 
 from mlvbench.stimuli.shapes import (
+    _central_disc,
     random_idsprite,
     split_figure,
 )
@@ -117,3 +118,66 @@ class TestRandomIdsprite:
         result_a = random_idsprite(64, _rng(0))
         result_b = random_idsprite(64, _rng(1))
         assert not np.array_equal(result_a, result_b)
+
+    @pytest.mark.parametrize("area", [0.1, 0.3, 0.55])
+    def test_rendered_area_matches_target(self, area):
+        """The rendered mask covers the requested fraction of the image."""
+        result = random_idsprite(224, _rng(0), area=area, margin=0.01)
+        assert result.mean() == pytest.approx(area, abs=0.005)
+
+    @pytest.mark.parametrize(("covers_center", "area"), [(True, 0.55), (False, 0.15)])
+    def test_center_constraint_respected(self, covers_center, area):
+        """The shape covers the central disc completely, or misses it completely."""
+        center = _central_disc(224, 0.02)
+        rng = _rng(0)
+
+        for _ in range(10):
+            result = random_idsprite(
+                224,
+                rng,
+                area=area,
+                covers_center=covers_center,
+                margin=0.01,
+            )
+            covered = result[..., 0][center] > 0
+            assert covered.all() if covers_center else not covered.any()
+
+    @pytest.mark.parametrize("area", [0.1, 0.55])
+    def test_margin_keeps_the_shape_surrounded(self, area):
+        """No foreground pixel touches the image border."""
+        rng = _rng(0)
+
+        for _ in range(10):
+            mask = random_idsprite(224, rng, area=area, margin=0.01)[..., 0]
+            assert not mask[0].any()
+            assert not mask[-1].any()
+            assert not mask[:, 0].any()
+            assert not mask[:, -1].any()
+
+    @pytest.mark.parametrize("bad_area", [0.0, 1.0, -0.5])
+    def test_invalid_area_raises(self, bad_area):
+        """Areas outside (0.0, 1.0) raise ValueError."""
+        with pytest.raises(ValueError):
+            random_idsprite(64, _rng(), area=bad_area)
+
+    def test_unreachable_area_raises(self):
+        """An area no shape can reach raises instead of looping forever."""
+        with pytest.raises(ValueError):
+            random_idsprite(64, _rng(), area=0.95, max_attempts=20)
+
+
+class TestCentralDisc:
+    def test_shape_and_dtype(self):
+        """Output is a boolean mask of shape (image_size, image_size)."""
+        disc = _central_disc(64, 0.05)
+        assert disc.shape == (64, 64)
+        assert disc.dtype == np.bool_
+
+    def test_contains_the_image_center(self):
+        """The disc covers the pixel closest to the image center."""
+        disc = _central_disc(64, 0.05)
+        assert disc[32, 32]
+
+    def test_is_never_empty(self):
+        """A radius rounding down to less than a pixel still yields one pixel."""
+        assert _central_disc(64, 0.0).sum() == 1
