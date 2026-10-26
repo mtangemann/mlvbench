@@ -15,8 +15,7 @@ class FigureGroundConvexityDataModule(ProceduralDataModule):
     """Data module for testing convexity as a figure-ground cue.
 
     Each image is split into two regions by a parabolic curve. The convex region is
-    labelled as the foreground, and the concave region as the background. Both regions
-    are filled with different textures from the DTD dataset.
+    labelled as the foreground, and the concave region as the background.
     """
 
     name = "figure_ground_convexity"
@@ -70,7 +69,19 @@ class FigureGroundConvexityDataModule(ProceduralDataModule):
         shape_rng = np.random.default_rng(seed=shape_seed)
         texture_rng = np.random.default_rng(seed=texture_seed)
 
-        segmentation = _random_arc_segmentation(self.image_size, rng=shape_rng)
+        # Sample area and center coverage such that both are uninformative about which
+        # region is foreground: There's a 50% chance of the convex area covering the
+        # center. If the center is covered, the convex area is larger than the
+        # background are and vice versa.
+        covers_center = bool(shape_rng.random() < 0.5)
+        low, high = (
+            (0.70, 0.80) if covers_center else (0.20, 0.30)
+        )
+        area = shape_rng.uniform(low, high)
+
+        segmentation = _random_arc_segmentation(
+            self.image_size, rng=shape_rng, area=area,
+        )
         textures = self.textures[subset]
         image = texturize(segmentation, textures, rng=texture_rng)
         sample = {"image": image, "segmentation": segmentation}
@@ -118,6 +129,7 @@ class FigureGroundConvexityDataModule(ProceduralDataModule):
 def _random_arc_segmentation(
     image_size: int,
     rng: np.random.Generator,
+    area: float = 0.5,
 ) -> np.ndarray:
     """Create a binary segmentation map by splitting a square image with a bent arc.
 
@@ -125,17 +137,18 @@ def _random_arc_segmentation(
     region (label 1) is the set of pixels above the parabola; the concave region
     (label 0) is the set of pixels below it.
 
-    The parabola is vertically shifted so that exactly 50% of pixels fall in each
-    region.
+    The parabola is shifted perpendicular to its axis so that the convex region covers
+    the requested fraction of the image.
 
     Args:
         image_size: Side length of the square image in pixels.
         rng: Random number generator used for reproducibility.
+        area: Fraction of the image covered by the convex region.
 
     Returns:
         Segmentation map as uint8 numpy array of shape `(image_size, image_size, 1)`
-            with values 0 (concave/background) and 1 (convex/foreground). Each region
-            covers approximately 50% of the image.
+            with values 0 (concave/background) and 1 (convex/foreground). The convex
+            region covers approximately `area` of the image.
     """
     coordinates = np.arange(image_size)
     xs, ys = np.meshgrid(coordinates, coordinates)
@@ -143,18 +156,17 @@ def _random_arc_segmentation(
     pivot_x = rng.uniform(0.25 * image_size, 0.75 * image_size)
     pivot_y = rng.uniform(0.25 * image_size, 0.75 * image_size)
     angle = rng.uniform(0, 2 * np.pi)
-    bend = rng.uniform(1.0, 3.0)
+    curvature = rng.uniform(1.0, 2.0)
 
     cos_a, sin_a = np.cos(angle), np.sin(angle)
     # Local coordinates normalised by image_size so that bend is scale-invariant.
     u = ((xs - pivot_x) * cos_a + (ys - pivot_y) * sin_a) / image_size
     v = (-(xs - pivot_x) * sin_a + (ys - pivot_y) * cos_a) / image_size
 
-    # Shift the parabola so that the median pixel sits exactly on the arc, giving a
-    # 50/50 split. The shifted parabola v = bend*u² + offset is still the boundary of
-    # a convex region (shifting does not affect convexity).
-    arc = bend * u**2
-    offset = np.median(v - arc)
+    # Shift the parabola to the quantile that leaves the requested fraction of pixels
+    # above the arc.
+    arc = curvature * u**2
+    offset = np.quantile(v - arc, 1.0 - area)
     result = (v - arc > offset).astype(np.uint8)
 
     return result[..., np.newaxis]
