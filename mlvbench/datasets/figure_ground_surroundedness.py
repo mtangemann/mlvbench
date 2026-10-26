@@ -35,10 +35,17 @@ class FigureGroundSurroundednessDataModule(ProceduralDataModule):
         },
     }
 
-    def __init__(self, seed: int = 0):
-        """Initialize the data module."""
+    def __init__(self, seed: int = 0, margin: float = 0.01):
+        """Initialize the data module.
+
+        Args:
+            seed: Random seed for generating the stimuli.
+            margin: Minimum distance between the figure and the image border, as a
+                fraction of the image size. Guarantees that the figure is surrounded.
+        """
         super().__init__()
         self.seed = seed
+        self.margin = margin
         self.num_samples = {
             "train": 10000,
             "val": 1000,
@@ -57,6 +64,7 @@ class FigureGroundSurroundednessDataModule(ProceduralDataModule):
             "seed": self.seed,
             "num_samples": self.num_samples,
             "image_size": self.image_size,
+            "margin": self.margin,
         }
 
     def before_generate(self, seed: int) -> None:
@@ -70,7 +78,24 @@ class FigureGroundSurroundednessDataModule(ProceduralDataModule):
         shape_rng = np.random.default_rng(seed=shape_seed)
         texture_rng = np.random.default_rng(seed=texture_seed)
 
-        segmentation = random_idsprite(self.image_size, rng=shape_rng)
+        # Sample shape area and center coverage such that both are uninformative about
+        # which region is foreground: There's a 50% chance of covering the center. If
+        # the center is covered, the shape is larger than the background are and vice
+        # versa.
+        covers_center = bool(shape_rng.random() < 0.5)
+        low, high = (
+            (0.50, 0.60) if covers_center else (0.08, 0.25)
+        )
+        area = shape_rng.uniform(low, high)
+
+        segmentation = random_idsprite(
+            self.image_size,
+            rng=shape_rng,
+            area=area,
+            covers_center=covers_center,
+            center_radius=0.02,
+            margin=self.margin,
+        )
         segmentation = (segmentation > 0).astype(np.uint8)
         textures = self.textures[subset]
         image = texturize(segmentation, textures, rng=texture_rng)

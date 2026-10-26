@@ -68,21 +68,53 @@ def split_figure(
     return result
 
 
-def random_idsprite(image_size: int, rng: np.random.Generator) -> np.ndarray:
+def random_idsprite(
+    image_size: int,
+    rng: np.random.Generator,
+    *,
+    area: float = 0.5,
+    covers_center: bool | None = None,
+    center_radius: float = 0.02,
+    margin: float = 0.0,
+    max_attempts: int = 200,
+) -> np.ndarray:
     """Generate a segmentation map for a random idsprite.
 
     The shape generation is adapted from the
     [idsprites](https://github.com/sbdzdz/idsprites/) library (Dziadzio et al., 2023).
 
+    Shapes are sampled until one can be scaled and placed to satisfy `area`,
+    `covers_center` and `margin`.
+
     Args:
         image_size: Side length of the square image in pixels.
         rng: NumPy random number generator for reproducibility.
+        area: Target area of the shape as a fraction of the image area. Measured on the
+            rendered mask, so the returned map matches this closely (within ~0.1% of the
+            image area) rather than only in terms of the underlying polygon.
+        covers_center: Whether the shape must cover the center of the image (`True`),
+            must avoid it (`False`), or is placed without a constraint (`None`). The
+            center is the disc of radius `center_radius`, which has to be covered
+            completely or missed completely.
+        center_radius: Radius of the central disc, as a fraction of `image_size`.
+        margin: Minimum distance between the shape and the image border, as a fraction
+            of `image_size`. With the default of 0.0 the shape may touch the border.
+        max_attempts: Maximum number of shapes to sample before giving up.
 
     Returns:
         Region map as uint8 NumPy array of shape `(image_size, image_size, 1)`
             with values 0 (background) and 1 (foreground shape).
+
+    Raises:
+        ValueError: If `area` is not in (0.0, 1.0), or if no shape satisfying the
+            constraints was found within `max_attempts`.
     """
-    while True:
+    if not (0.0 < area < 1.0):
+        raise ValueError(f"area must be in (0.0, 1.0), got {area}")
+
+    center = _central_disc(image_size, center_radius)
+
+    for _ in range(max_attempts):
         vertices = _sample_vertex_positions(rng)
         shape = (
             _interpolate(vertices)
@@ -90,13 +122,47 @@ def random_idsprite(image_size: int, rng: np.random.Generator) -> np.ndarray:
             else _interpolate(vertices, k=1)
         )
         try:
-            shape = _position_shape(shape, image_size, area=0.5, rng=rng)
-            break
+            shape = _position_shape(
+                shape,
+                image_size,
+                area=area,
+                rng=rng,
+                covers_center=covers_center,
+                center=center,
+                margin=margin,
+            )
         except ValueError:
             continue
 
-    regions = _render_shape(shape, image_size)
-    return regions[..., np.newaxis]
+        regions = _render_shape(shape, image_size)
+        return regions[..., np.newaxis]
+
+    raise ValueError(
+        f"Could not generate a shape with area {area}, covers_center={covers_center} "
+        f"and margin {margin} within {max_attempts} attempts"
+    )
+
+
+def _central_disc(image_size: int, radius: float) -> npt.NDArray[np.bool_]:
+    """Return a mask of the central disc with the given radius.
+
+    Args:
+        image_size: Side length of the square image in pixels.
+        radius: Radius of the disc, as a fraction of `image_size`.
+
+    Returns:
+        Boolean mask of shape `(image_size, image_size)`. The mask is never empty: it
+            always contains at least the pixel closest to the image center.
+    """
+    center = (image_size - 1) / 2
+    coordinates = np.arange(image_size) - center
+    rows, columns = np.meshgrid(coordinates, coordinates, indexing="ij")
+    disc = np.hypot(rows, columns) <= radius * image_size
+
+    if not disc.any():
+        disc[int(round(center)), int(round(center))] = True
+
+    return disc
 
 
 # Adapted from https://github.com/sbdzdz/idsprites/blob/96c0210a0124dad9283073206f3fb13be29b252b/idsprites/infinite_dsprites.py#L202-L230
@@ -165,8 +231,36 @@ def _position_shape(
     image_size: int,
     area: float,
     rng: np.random.Generator,
+    *,
+    covers_center: bool | None = None,
+    center: npt.NDArray[np.bool_] | None = None,
+    margin: float = 0.0,
+    placement_attempts: int = 40,
 ) -> npt.NDArray:
-    """Position a shape in the image."""
+    """Scale a shape to the requested area and place it in the image.
+
+    Args:
+        shape: The shape to place, an array of shape `(2, num_points)`.
+        image_size: Side length of the square image in pixels.
+        area: Target area of the rendered shape, as a fraction of the image area.
+        rng: NumPy random number generator for reproducibility.
+        covers_center: Whether the shape must cover `center` completely (`True`), must
+            miss it completely (`False`), or is placed without a constraint (`None`).
+        center: Boolean mask of the central region, required unless `covers_center`
+            is `None`.
+        margin: Minimum distance between the shape and the image border, as a fraction
+            of `image_size`.
+        placement_attempts: Maximum number of offsets to try before giving up on this
+            shape.
+
+    Returns:
+        The scaled and translated shape, an array of shape `(2, num_points)`.
+
+    Raises:
+        ValueError: If the shape cannot be scaled to `area` without growing beyond the
+            image, if it does not leave room for `margin`, or if no offset satisfying
+            `covers_center` was found.
+    """
     angle = rng.uniform(0, 2 * np.pi)
     shape = _rotate_shape(shape, angle)
 
@@ -179,25 +273,79 @@ def _position_shape(
     shape = shape * scale
     shape = shape + np.array([[1], [1]])
 
-    mask = _render_shape(shape, image_size)
-    native_area = mask.sum() / image_size**2
-    scale = np.sqrt(area / native_area)
+    shape = _scale_to_area(shape, image_size, area)
 
-    if scale > 1.0:
-        raise ValueError(f"Scale {scale} is greater than 1.0")
+    # Move the shape into the corner, so that the offsets below control the distance to
+    # the image border exactly.
+    shape = shape - np.array([[shape[0, :].min()], [shape[1, :].min()]])
+    width = shape[0, :].max()
+    height = shape[1, :].max()
 
-    shape = shape * scale
+    low = margin * image_size
+    high_x = image_size - 1 - low - width
+    high_y = image_size - 1 - low - height
 
-    xmin, xmax = shape[0, :].min(), shape[0, :].max()
-    ymin, ymax = shape[1, :].min(), shape[1, :].max()
-    width = xmax - xmin
-    height = ymax - ymin
+    if high_x <= low or high_y <= low:
+        raise ValueError(
+            f"Shape of area {area} does not leave room for a margin of {margin}"
+        )
 
-    offset_x = rng.uniform(0, image_size - 1 - width)
-    offset_y = rng.uniform(0, image_size - 1 - height)
-    shape = shape + np.array([[offset_x], [offset_y]])
+    if covers_center is None:
+        offset = np.array([[rng.uniform(low, high_x)], [rng.uniform(low, high_y)]])
+        return shape + offset
 
-    return shape
+    if center is None:
+        raise ValueError("center is required when covers_center is not None")
+
+    for _ in range(placement_attempts):
+        offset = np.array([[rng.uniform(low, high_x)], [rng.uniform(low, high_y)]])
+        placed = shape + offset
+        covered = _render_shape(placed, image_size)[center] > 0
+        if covered.all() if covers_center else not covered.any():
+            return placed
+
+    raise ValueError(
+        f"Could not place a shape of area {area} with covers_center={covers_center} "
+        f"within {placement_attempts} attempts"
+    )
+
+
+def _scale_to_area(
+    shape: npt.NDArray,
+    image_size: int,
+    area: float,
+    iterations: int = 3,
+) -> npt.NDArray:
+    """Scale a shape so that its rendered area matches the target.
+
+    Args:
+        shape: The shape to scale, an array of shape `(2, num_points)` positioned in the
+            top left corner of the image at its maximum size.
+        image_size: Side length of the square image in pixels.
+        area: Target area of the rendered shape, as a fraction of the image area.
+        iterations: Number of refinement steps.
+
+    Returns:
+        The scaled shape, an array of shape `(2, num_points)`.
+
+    Raises:
+        ValueError: If reaching `area` would require growing the shape beyond the image,
+            or if the shape renders empty.
+    """
+    scale = 1.0
+
+    for _ in range(iterations):
+        current_area = _render_shape(shape * scale, image_size).sum() / image_size**2
+
+        if current_area <= 0.0:
+            raise ValueError("Shape renders as an empty mask")
+
+        scale *= np.sqrt(area / current_area)
+
+        if scale > 1.0:
+            raise ValueError(f"Scale {scale} is greater than 1.0")
+
+    return shape * scale
 
 
 # Adapted from https://github.com/sbdzdz/idsprites/blob/96c0210a0124dad9283073206f3fb13be29b252b/idsprites/infinite_dsprites.py#L309-L323
