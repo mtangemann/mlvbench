@@ -7,6 +7,7 @@ import numpy as np
 from mlvbench.cache import PrecomputedDataset
 from mlvbench.datasets._base import ProceduralDataModule
 from mlvbench.models import Model
+from mlvbench.stimuli.colors import colorize
 from mlvbench.stimuli.shapes import split_figure
 from mlvbench.stimuli.textures import load_textures, texturize
 
@@ -29,6 +30,16 @@ class FigureGroundConvexityDataModule(ProceduralDataModule):
         "test_reversed": {"image": "image_reversed", "segmentation": "segmentation"},
         "test_split": {
             "image": "image_split",
+            "segmentation": "segmentation",
+            "texture_segmentation": "segmentation_split",
+        },
+        "test_color": {"image": "image_color", "segmentation": "segmentation"},
+        "test_color_reversed": {
+            "image": "image_color_reversed",
+            "segmentation": "segmentation",
+        },
+        "test_color_split": {
+            "image": "image_color_split",
             "segmentation": "segmentation",
             "texture_segmentation": "segmentation_split",
         },
@@ -68,6 +79,8 @@ class FigureGroundConvexityDataModule(ProceduralDataModule):
         shape_seed, texture_seed = rng.integers(0, 2**32, size=2)
         shape_rng = np.random.default_rng(seed=shape_seed)
         texture_rng = np.random.default_rng(seed=texture_seed)
+        split_seed = rng.integers(0, 2**32, size=1)
+        split_rng = np.random.default_rng(seed=split_seed)
 
         # Sample area and center coverage such that both are uninformative about which
         # region is foreground: There's a 50% chance of the convex area covering the
@@ -83,10 +96,13 @@ class FigureGroundConvexityDataModule(ProceduralDataModule):
             self.image_size, rng=shape_rng, area=area,
         )
         textures = self.textures[subset]
-        image = texturize(segmentation, textures, rng=texture_rng)
-        sample = {"image": image, "segmentation": segmentation}
 
         if subset == "test":
+            # For the test set, we consider all colorization and texturization variants
+            # for each example.
+            image = texturize(segmentation, textures, rng=texture_rng)
+            sample = {"image": image, "segmentation": segmentation}
+
             # Reinitialize the texture RNG, so that we sample the same textures for the
             # reversed image.
             texture_rng = np.random.default_rng(seed=texture_seed)
@@ -96,14 +112,38 @@ class FigureGroundConvexityDataModule(ProceduralDataModule):
             # Split the foreground into two sub-regions, each with a different texture,
             # while keeping the segmentation label unchanged (single foreground region).
             texture_rng = np.random.default_rng(seed=texture_seed)
-            split_seed = rng.integers(0, 2**32, size=1)
-            split_rng = np.random.default_rng(seed=split_seed)
             split_region_map = split_figure(
                 segmentation, split_rng, min_region_size=0.25
             )
             image_split = texturize(split_region_map, textures, rng=texture_rng)
             sample["image_split"] = image_split
             sample["segmentation_split"] = split_region_map
+
+            # The color variants reuse the texture seed, so a region keeps its
+            # color across the variants just like it keeps its texture.
+            color_rng = np.random.default_rng(seed=texture_seed)
+            sample["image_color"] = colorize(segmentation, rng=color_rng)
+
+            color_rng = np.random.default_rng(seed=texture_seed)
+            sample["image_color_reversed"] = colorize(1 - segmentation, rng=color_rng)
+
+            color_rng = np.random.default_rng(seed=texture_seed)
+            sample["image_color_split"] = colorize(split_region_map, rng=color_rng)
+
+        else:
+            # For the training and validation set, we randomly select a colorization or
+            # texturization variant.
+            texture_segmentation = segmentation
+            if rng.random() < 1/3:
+                texture_segmentation = split_figure(
+                    segmentation, split_rng, min_region_size=0.25
+                )
+            if rng.random() < 0.5:
+                image = texturize(texture_segmentation, textures, rng=texture_rng)
+            else:
+                image = colorize(texture_segmentation, rng=texture_rng)
+
+            sample = {"image": image, "segmentation": segmentation}
 
         return sample
 
