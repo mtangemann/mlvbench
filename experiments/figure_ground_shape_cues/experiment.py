@@ -17,6 +17,7 @@ from mlvbench.datasets import (
     FigureGroundSurroundednessDataModule,
     FigureGroundSymmetryDataModule,
     PrecomputedMSRA10KDataModule,
+    TexturizedMSRA10KDataModule,
 )
 from mlvbench.infrastructure import resolve_layers, save_metadata, save_model_info
 from mlvbench.models import Model, build_model
@@ -27,10 +28,11 @@ LOGGER = logging.getLogger(__name__)
 
 
 Condition = Literal[
-    "natural", "surroundedness", "convexity", "symmetry", "parallelism"
+    "natural", "texturized", "surroundedness", "convexity", "symmetry", "parallelism"
 ]
 _DATA_MODULES = {
     "natural": PrecomputedMSRA10KDataModule,
+    "texturized": TexturizedMSRA10KDataModule,
     "surroundedness": FigureGroundSurroundednessDataModule,
     "convexity": FigureGroundConvexityDataModule,
     "symmetry": FigureGroundSymmetryDataModule,
