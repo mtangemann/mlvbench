@@ -10,6 +10,7 @@ from skimage.draw import polygon as sk_polygon
 from mlvbench.cache import PrecomputedDataset
 from mlvbench.datasets._base import ProceduralDataModule
 from mlvbench.models import Model
+from mlvbench.stimuli.colors import colorize
 from mlvbench.stimuli.textures import load_textures, texturize
 
 
@@ -17,13 +18,18 @@ class FigureGroundSymmetryDataModule(ProceduralDataModule):
     """Data module for testing symmetry as a figure-ground cue."""
 
     name = "figure_ground_symmetry"
-    version = "1.0.0"
+    version = "2.0.0-dev"
 
     # All test subsets are views onto the same generated test split and differ only in
     # the image variant they read.
     _TEST_FEATURES = {
         "test": { "image": "image", "segmentation": "segmentation" },
         "test_reversed": { "image": "image_reversed", "segmentation": "segmentation" },
+        "test_color": {"image": "image_color", "segmentation": "segmentation"},
+        "test_color_reversed": {
+            "image": "image_color_reversed",
+            "segmentation": "segmentation",
+        },
     }
 
     def __init__(self, seed: int = 0):
@@ -70,18 +76,36 @@ class FigureGroundSymmetryDataModule(ProceduralDataModule):
         )
 
         textures = self.textures[subset]
-        image = texturize(segmentation, textures, rng=texture_rng)
-        sample = {
-            "image": image,
-            "segmentation": segmentation,
-        }
 
         if subset == "test":
+            # For the test set, we consider all colorization and texturization variants
+            # for each example.
+            image = texturize(segmentation, textures, rng=texture_rng)
+            sample = {"image": image, "segmentation": segmentation}
+
             # Reinitialize the texture RNG, so that we sample the same textures for the
             # reversed image.
             texture_rng = np.random.default_rng(seed=texture_seed)
             image_reversed = texturize(1 - segmentation, textures, rng=texture_rng)
             sample["image_reversed"] = image_reversed
+
+            # The color variants reuse the texture seed, so a region keeps its
+            # color across the variants just like it keeps its texture.
+            color_rng = np.random.default_rng(seed=texture_seed)
+            sample["image_color"] = colorize(segmentation, rng=color_rng)
+
+            color_rng = np.random.default_rng(seed=texture_seed)
+            sample["image_color_reversed"] = colorize(1 - segmentation, rng=color_rng)
+
+        else:
+            # For the training and validation set, we randomly select a colorization or
+            # texturization variant.
+            if rng.random() < 0.5:
+                image = texturize(segmentation, textures, rng=texture_rng)
+            else:
+                image = colorize(segmentation, rng=texture_rng)
+
+            sample = {"image": image, "segmentation": segmentation}
 
         return sample
 
