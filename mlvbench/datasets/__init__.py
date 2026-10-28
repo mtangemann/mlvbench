@@ -6,6 +6,7 @@ from .figure_ground_parallelism import FigureGroundParallelismDataModule
 from .figure_ground_surroundedness import FigureGroundSurroundednessDataModule
 from .figure_ground_symmetry import FigureGroundSymmetryDataModule
 from .msra10k import MSRA10KDataModule, PrecomputedMSRA10KDataModule
+from .msra10k_texturized import TexturizedMSRA10KDataModule
 
 __all__ = [
     "DataModule",
@@ -15,4 +16,5 @@ __all__ = [
     "FigureGroundSymmetryDataModule",
     "MSRA10KDataModule",
     "PrecomputedMSRA10KDataModule",
+    "TexturizedMSRA10KDataModule",
 ]

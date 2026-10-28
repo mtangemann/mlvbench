@@ -116,7 +116,7 @@ class FigureGroundParallelismDataModule(ProceduralDataModule):
             raise ValueError(f"Unknown test subset: {subset}")
         return PrecomputedDataset(
             self._path / "test",
-            feature_map=self._TEST_FEATURES[subset],
+            features=self._TEST_FEATURES[subset],
             mmap=False,
         )
 
