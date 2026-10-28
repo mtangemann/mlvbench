@@ -13,12 +13,8 @@ def _rng(seed: int = 0) -> np.random.Generator:
     return np.random.default_rng(seed)
 
 
-def _symmetry_nominal_xs(image_size: int) -> tuple[int, int, int]:
-    return (
-        int(1 / 6 * image_size),
-        int(3 / 6 * image_size),
-        int(5 / 6 * image_size),
-    )
+def _symmetry_nominal_xs() -> tuple[float, float, float]:
+    return (1 / 6, 3 / 6, 5 / 6)
 
 
 class TestRandomSymmetryColumns:
@@ -67,6 +63,19 @@ class TestRandomSymmetryColumns:
         ]
         assert np.std(fractions) < 0.001
 
+    @pytest.mark.parametrize("seed", range(5))
+    def test_resolution_independence(self, seed):
+        """A stimulus at 448px is an upscaled version of the stimulus at 224px.
+
+        Up to rasterisation, downsampling the 448px stimulus by averaging 2x2 blocks
+        recovers the 224px stimulus. Only pixels along the edges may disagree.
+        """
+        low = _random_symmetry_columns(224, _rng(seed))[..., 0]
+        high = _random_symmetry_columns(448, _rng(seed))[..., 0]
+        downsampled = high.reshape(224, 2, 224, 2).mean(axis=(1, 3))
+        disagreement = np.abs(downsampled - low) > 0.5
+        assert disagreement.mean() < 0.005
+
     def test_reversed_segmentation_is_complement(self):
         """1 - segmentation is the logical complement with uint8 dtype."""
         seg = _random_symmetry_columns(64, _rng(0))
@@ -86,13 +95,12 @@ class TestRandomSymmetryColumns:
         With symmetry_val=1: a=1, b=0, so offset_2 = shape_pos = -offset_1.
         Mean-subtraction preserves the negation, so e1.x_offsets == -e2.x_offsets.
         """
-        image_size = 224
-        y_coords = np.linspace(-50, image_size + 50, 25)
+        y_coords = np.linspace(-0.2, 1.2, 25)
         e1, e2, _ = _sample_three_edges(
             _rng(),
-            _symmetry_nominal_xs(image_size),
+            _symmetry_nominal_xs(),
             y_coords,
-            offset_scale=10.0,
+            offset_scale=0.05,
             symmetry_val=1.0,
         )
         np.testing.assert_array_equal(e1.x_offsets, -e2.x_offsets)

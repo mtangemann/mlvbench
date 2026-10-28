@@ -5,6 +5,7 @@ from typing import Any, cast
 
 import numpy as np
 from matplotlib.path import Path as MPath
+from matplotlib.transforms import Affine2D
 from skimage.draw import polygon as sk_polygon
 
 from mlvbench.cache import PrecomputedDataset
@@ -72,7 +73,7 @@ class FigureGroundSymmetryDataModule(ProceduralDataModule):
             rng=shape_rng,
             symmetry_val=rng.choice([-1.0, 1.0]),
             num_control_points=10,
-            offset_scale=25.0,
+            offset_scale=25.0 / 224,
         )
 
         textures = self.textures[subset]
@@ -133,7 +134,7 @@ def _random_symmetry_columns(
     rng: np.random.Generator,
     num_control_points: int = 25,
     symmetry_val: float = 1.0,
-    offset_scale: float = 10.0,
+    offset_scale: float = 10.0 / 224,
 ) -> np.ndarray:
     """Create a segmentation map by splitting an image into two regions using columns.
 
@@ -157,22 +158,25 @@ def _random_symmetry_columns(
         num_control_points: Number of Bezier curve control points along the columns.
         symmetry_val: How symmetric each edge should be. 1.0 -> symmetric,
                 0 -> asymmetric, -1 -> oppositely symmetric
-        offset_scale: Scale of perturbations on each side of the column.
-                0.0 gives perfect rectangles.
+        offset_scale: Scale of perturbations on each side of the column, as a
+                fraction of the image width. 0.0 gives perfect rectangles.
 
     Returns:
         Segmentation map as uint8 numpy array of shape
             `(image_size, image_size, 1)` with values 0 (background) and 1 (foreground).
                 Each region covers approximately 50% of the image.
     """
+    # The geometry is constructed in normalized coordinates and only scaled to
+    # image_size when rendering, so that the stimulus is independent of the resolution.
     nominal_xs = (
-        int(1 / 6 * image_size),  # E1
-        int(3 / 6 * image_size),  # E2
-        int(5 / 6 * image_size),  # E3
+        1 / 6,  # E1
+        3 / 6,  # E2
+        5 / 6,  # E3
     )
 
-    # Pad beyond the image by 50 pixels on each side to prevent rendering artefacts
-    y_coords = np.linspace(-50, image_size + 50, num_control_points)
+    # Pad beyond the image (50px at the reference size) to prevent rendering artefacts
+    pad = 50 / 224
+    y_coords = np.linspace(-pad, 1 + pad, num_control_points)
 
     # Sample three edges according to seed and symmetry value
     E1, E2, E3 = _sample_three_edges(
@@ -180,7 +184,7 @@ def _random_symmetry_columns(
     )
 
     # Right-side extends off screen; Represent as straight synthetic edge for renderer
-    off_right = _Edge(float(image_size + 500), y_coords, np.zeros_like(y_coords))
+    off_right = _Edge(1 + 500 / 224, y_coords, np.zeros_like(y_coords))
     black_regions = [(E1, E2), (E3, off_right)]
 
     # Assign figure/ground based on symmetry value
@@ -290,9 +294,10 @@ def _get_bezier_segments(edge: _Edge, reverse: bool = False):
 def _render_mask(image_size, edge_pairs) -> np.ndarray:
     """Render the segmentation foreground/background mask."""
     mask = np.zeros((image_size, image_size), dtype=np.uint8)
+    to_pixels = Affine2D().scale(image_size)
     for left, right in edge_pairs:
         path = _column_path(left, right)
-        verts = path.to_polygons(closed_only=False)[0]
+        verts = path.to_polygons(transform=to_pixels, closed_only=False)[0]
         rr, cc = sk_polygon(verts[:, 1], verts[:, 0], shape=mask.shape)  # type: ignore
         mask[rr, cc] = True
     return mask
