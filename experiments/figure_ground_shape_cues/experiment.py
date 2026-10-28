@@ -13,6 +13,7 @@ from baselines import Baseline, iter_baselines
 from mlvbench.datasets import (
     DataModule,
     FigureGroundConvexityDataModule,
+    FigureGroundParallelismDataModule,
     FigureGroundSurroundednessDataModule,
     FigureGroundSymmetryDataModule,
     PrecomputedMSRA10KDataModule,
@@ -25,12 +26,15 @@ from mlvbench.trainer import ProbeTrainer
 LOGGER = logging.getLogger(__name__)
 
 
-Condition = Literal["natural", "surroundedness", "convexity", "symmetry"]
+Condition = Literal[
+    "natural", "surroundedness", "convexity", "symmetry", "parallelism"
+]
 _DATA_MODULES = {
     "natural": PrecomputedMSRA10KDataModule,
     "surroundedness": FigureGroundSurroundednessDataModule,
     "convexity": FigureGroundConvexityDataModule,
     "symmetry": FigureGroundSymmetryDataModule,
+    "parallelism": FigureGroundParallelismDataModule,
 }
 
 
