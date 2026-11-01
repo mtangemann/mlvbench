@@ -254,11 +254,11 @@ write_workspace_readme()
 submitted_jobs = 0
 
 EXECUTOR.update_parameters(
-    slurm_partition="gpubase_l40s_b1",
+    slurm_partition="gpubase_l40s_b2",
     cpus_per_task=8,
     mem_gb=32,
     gpus_per_node=0,
-    timeout_min=180,
+    timeout_min=300,
     stderr_to_stdout=True,
 )
 
@@ -318,11 +318,11 @@ else:
 # -------------------------------------------------------------------------------------
 
 EXECUTOR.update_parameters(
-    slurm_partition="gpubase_l40s_b1",
+    slurm_partition="gpubase_l40s_b2",
     cpus_per_task=8,
     mem_gb=32,
     gpus_per_node=1,
-    timeout_min=180,
+    timeout_min=300,
     stderr_to_stdout=True,
 )
 
