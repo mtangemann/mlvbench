@@ -180,14 +180,14 @@ class BinarySegmentationEvaluator(Evaluator):
 
                 self.predictions.append({
                     "__key__": key,
-                    "image": batch["image"][i].cpu(),
-                    "segmentation": batch["segmentation"][i].cpu(),
-                    "target": target[i].view(target_height, target_width).cpu(),
+                    "image": batch["image"][i].to("cpu", copy=True),
+                    "segmentation": batch["segmentation"][i].to("cpu", copy=True),
+                    "target": target[i].view(target_height, target_width).to("cpu", copy=True),  # noqa: E501
                     "weight": (
                         None if weight is None
-                        else weight[i].view(target_height, target_width).cpu()
+                        else weight[i].view(target_height, target_width).to("cpu", copy=True)  # noqa: E501
                     ),
-                    "prediction": prediction[i].view(target_height, target_width).cpu()
+                    "prediction": prediction[i].view(target_height, target_width).to("cpu", copy=True),  # noqa: E501
                 })
 
     def _update_single(
