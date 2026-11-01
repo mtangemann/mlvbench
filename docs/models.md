@@ -351,13 +351,18 @@ The original Vision Transformer checkpoints pretrained on ImageNet-21K and optio
 ## Perception Encoder
 [Bolya et al. (2025)](http://arxiv.org/abs/2504.13181)
 
-Meta AI's PE-Core vision backbone trained on a large vision–language mix to produce spatially rich representations for dense perception tasks.
+Meta AI's PE-Core and PE-Spatial vision backbones trained on a large vision–language mix to produce spatially rich representations for dense perception tasks.
 
 - [`timm/vit_pe_core_base_patch16_224.fb`](https://huggingface.co/timm/vit_pe_core_base_patch16_224.fb)
 - [`timm/vit_pe_core_gigantic_patch14_448.fb`](https://huggingface.co/timm/vit_pe_core_gigantic_patch14_448.fb)
 - [`timm/vit_pe_core_large_patch14_336.fb`](https://huggingface.co/timm/vit_pe_core_large_patch14_336.fb)
 - [`timm/vit_pe_core_small_patch16_384.fb`](https://huggingface.co/timm/vit_pe_core_small_patch16_384.fb)
 - [`timm/vit_pe_core_tiny_patch16_384.fb`](https://huggingface.co/timm/vit_pe_core_tiny_patch16_384.fb)
+- [`timm/vit_pe_spatial_base_patch16_512.fb`](https://huggingface.co/timm/vit_pe_spatial_base_patch16_512.fb)
+- [`timm/vit_pe_spatial_gigantic_patch14_448.fb`](https://huggingface.co/timm/vit_pe_spatial_gigantic_patch14_448.fb)
+- [`timm/vit_pe_spatial_large_patch14_448.fb`](https://huggingface.co/timm/vit_pe_spatial_large_patch14_448.fb)
+- [`timm/vit_pe_spatial_small_patch16_512.fb`](https://huggingface.co/timm/vit_pe_spatial_small_patch16_512.fb)
+- [`timm/vit_pe_spatial_tiny_patch16_512.fb`](https://huggingface.co/timm/vit_pe_spatial_tiny_patch16_512.fb)
 
 ## RoPE ViT
 [Heo et al. (2024)](https://link.springer.com/chapter/10.1007/978-3-031-72684-2_17)
