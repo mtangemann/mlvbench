@@ -272,13 +272,18 @@ _SUPPORTED_MODELS = [
     "beit3_large_patch16_224.pt",
     "beit3_large_patch16_224.indomain_pt",
 
-    # Perception Encoder Core models trained on custom vision/text data
+    # Perception Encoder models trained on custom vision/text data
     # https://github.com/huggingface/pytorch-image-models/blob/6e3fdda39508db30766f9d9e6ec32380ebee8b8c/timm/models/eva.py#L1565
     "vit_pe_core_tiny_patch16_384.fb",
     "vit_pe_core_small_patch16_384.fb",
     "vit_pe_core_base_patch16_224.fb",
     "vit_pe_core_large_patch14_336.fb",
     "vit_pe_core_gigantic_patch14_448.fb",
+    "vit_pe_spatial_tiny_patch16_512.fb",
+    "vit_pe_spatial_small_patch16_512.fb",
+    "vit_pe_spatial_base_patch16_512.fb",
+    "vit_pe_spatial_large_patch14_448.fb",
+    "vit_pe_spatial_gigantic_patch14_448.fb",
 
     # DINO self-supervised models
     # https://github.com/huggingface/pytorch-image-models/blob/6e3fdda39508db30766f9d9e6ec32380ebee8b8c/timm/models/vision_transformer.py#L1976

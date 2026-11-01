@@ -42,8 +42,8 @@ _STANDARD25 = [
     "timm/eva02_base_patch14_224.mim_in22k",
     "timm/eva02_large_patch14_224.mim_in22k",
     # Perception Encoder
-    "timm/vit_pe_core_base_patch16_224.fb",
-    "timm/vit_pe_core_large_patch14_336.fb",
+    "timm/vit_pe_spatial_base_patch16_512.fb",
+    "timm/vit_pe_spatial_large_patch14_448.fb",
     # BEiT
     "timm/beit_base_patch16_224.in22k_ft_in22k",
     "timm/beit_large_patch16_224.in22k_ft_in22k",
