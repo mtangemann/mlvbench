@@ -1,9 +1,16 @@
-# Default configuration for the experiment.
+# Direct training on synthetic eval conditions (decodability topline).
 
 models:
   - standard25
 
-random_baselines: True
+random_baselines: False
+
+conditions:
+  - texturized
+  - surroudnedness
+  - convexity
+  - symmetry
+  - parallelism
 
 # Use smaller batch sizes for models using large input resolutions. The effective batch
 # size is always 256.

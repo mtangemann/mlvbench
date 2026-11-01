@@ -35,7 +35,7 @@ parser.add_argument(
 parser.add_argument(
     "--config",
     type=Path,
-    default=ROOT / "configs" / "default.yaml",
+    default=ROOT / "configs" / "natural.yaml",
 )
 parser.add_argument("--retry", default=False, action=argparse.BooleanOptionalAction)
 parser.add_argument("--warmup", default=True, action=argparse.BooleanOptionalAction)
