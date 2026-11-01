@@ -4,7 +4,7 @@
 # patch size of 16 and a resolution of 224, except for DINOv3 which uses an input
 # resolution of 256.
 _STANDARD5 = [
-    "timm/vit_base_patch16_224.augreg_in21k_ft_in1k",
+    "timm/deit3_base_patch16_224.fb_in22k_ft_in1k",
     "timm/vit_base_patch16_siglip_224.v2_webli",
     "timm/beit3_base_patch16_224.in22k_ft_in1k",
     "timm/vit_base_patch16_dinov3.lvd1689m",
@@ -17,7 +17,7 @@ _STANDARD5 = [
 # resolution of 224, and a resolution of 256 for SigLIP ViT-L and DINOv3.
 _STANDARD10 = [
     *_STANDARD5,
-    "timm/vit_large_patch16_224.augreg_in21k_ft_in1k",
+    "timm/deit3_large_patch16_224.fb_in22k_ft_in1k",
     "timm/vit_large_patch16_siglip_256.v2_webli",
     "timm/beit3_large_patch16_224.in22k_ft_in1k",
     "timm/vit_large_patch16_dinov3.lvd1689m",
