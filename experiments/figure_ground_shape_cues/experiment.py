@@ -67,14 +67,8 @@ def warmup(config: Config) -> None:
         config.model, pretrained=config.pretrained, seed=config.model_seed
     )
 
-    # Probes trained on natural data are evaluated zero-shot for all other conditions,
-    # so we need to prepare all data modules.
-    if config.condition == "natural":
-        conditions = _DATA_MODULES.keys()
-    else:
-        conditions = [config.condition]
-
-    for condition in conditions:
+    # We always evaluate on all conditions, so we need to prepare all data modules.
+    for condition in _DATA_MODULES.keys():
         data_module = _DATA_MODULES[condition]()
         data_module.configure(model)
         data_module.prepare_data()
@@ -134,14 +128,7 @@ def run_model(config: Config, output_path: Path) -> None:
     val_loader = data_module.val_dataloader(**dataloader_kwargs)
     trainer.evaluate(model, val_loader, probe_path, config.save_predictions)
 
-    # Probes trained on natural data are evaluated zero-shot for all other conditions,
-    # in all other cases we only evaluate in domain.
-    if config.condition == "natural":
-        eval_conditions = _DATA_MODULES.keys()
-    else:
-        eval_conditions = [config.condition]
-
-    for condition in eval_conditions:
+    for condition in _DATA_MODULES.keys():
         # configure, prepare_data and setup are cheap when the data is prepared, so we
         # keep the code simple and recreate the training data module.
         data_module = _DATA_MODULES[condition]()
