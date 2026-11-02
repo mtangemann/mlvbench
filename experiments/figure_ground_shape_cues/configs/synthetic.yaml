@@ -7,7 +7,7 @@ random_baselines: False
 
 conditions:
   - texturized
-  - surroudnedness
+  - surroundedness
   - convexity
   - symmetry
   - parallelism
