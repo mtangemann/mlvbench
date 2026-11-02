@@ -39,6 +39,12 @@ parser.add_argument(
 )
 parser.add_argument("--retry", default=False, action=argparse.BooleanOptionalAction)
 parser.add_argument("--warmup", default=True, action=argparse.BooleanOptionalAction)
+parser.add_argument(
+    "--baselines-only",
+    default=False,
+    action=argparse.BooleanOptionalAction,
+    help="Only run the baselines, but not the probe training.",
+)
 parser.add_argument("--debug", default=False, action=argparse.BooleanOptionalAction)
 
 ARGS = parser.parse_args()
@@ -311,6 +317,11 @@ if SLURM:
 
 else:
     run_baselines_all()
+
+if ARGS.baselines_only:
+    if SLURM:
+        print(f"Submitted {submitted_jobs} jobs")
+    exit()
 
 
 # -------------------------------------------------------------------------------------
