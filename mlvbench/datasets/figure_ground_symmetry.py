@@ -19,7 +19,7 @@ class FigureGroundSymmetryDataModule(ProceduralDataModule):
     """Data module for testing symmetry as a figure-ground cue."""
 
     name = "figure_ground_symmetry"
-    version = "2.0.0-dev"
+    version = "2.0.0"
 
     # All test subsets are views onto the same generated test split and differ only in
     # the image variant they read.

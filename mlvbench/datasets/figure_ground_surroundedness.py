@@ -21,7 +21,7 @@ class FigureGroundSurroundednessDataModule(ProceduralDataModule):
     """
 
     name = "figure_ground_surroundedness"
-    version = "2.0.0-dev"
+    version = "2.0.0"
 
     # All test subsets are views onto the same generated test split and differ only in
     # the image variant they read. `texture_segmentation` is the region map that was

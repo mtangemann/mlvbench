@@ -19,7 +19,7 @@ class TexturizedMSRA10KDataModule(ProceduralDataModule):
     """Data module filling MSRA-10K segmentation masks with DTD textures or colors."""
 
     name = "msra10k_texturized"
-    version = "1.0.0-dev"
+    version = "1.0.0"
 
     # All test subsets are views onto the same generated test split and differ only in
     # the image variant they read. `texture_segmentation` is the region map that was
