@@ -18,7 +18,7 @@ class FigureGroundParallelismDataModule(ProceduralDataModule):
     """Data module for testing parallelism as a figure-ground cue."""
 
     name = "figure_ground_parallelism"
-    version = "1.0.0-dev"
+    version = "1.0.0"
 
     # All test subsets are views onto the same generated test split and differ only in
     # the image variant they read.
