@@ -29,9 +29,9 @@ _STANDARD10 = [
 # using ViT-B and ViT-L variants.
 _STANDARD25 = [
     *_STANDARD10,
-    # DeiT III
-    "timm/deit3_base_patch16_224.fb_in22k_ft_in1k",
-    "timm/deit3_large_patch16_224.fb_in22k_ft_in1k",
+    # AugReg ViT
+    "timm/vit_base_patch16_224.augreg_in21k_ft_in1k",
+    "timm/vit_large_patch16_224.augreg_in21k_ft_in1k",
     # FlexiViT
     "timm/flexivit_base.1200ep_in1k",
     "timm/flexivit_large.1200ep_in1k",

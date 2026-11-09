@@ -35,10 +35,16 @@ parser.add_argument(
 parser.add_argument(
     "--config",
     type=Path,
-    default=ROOT / "configs" / "default.yaml",
+    default=ROOT / "configs" / "natural.yaml",
 )
 parser.add_argument("--retry", default=False, action=argparse.BooleanOptionalAction)
 parser.add_argument("--warmup", default=True, action=argparse.BooleanOptionalAction)
+parser.add_argument(
+    "--baselines-only",
+    default=False,
+    action=argparse.BooleanOptionalAction,
+    help="Only run the baselines, but not the probe training.",
+)
 parser.add_argument("--debug", default=False, action=argparse.BooleanOptionalAction)
 
 ARGS = parser.parse_args()
@@ -254,11 +260,11 @@ write_workspace_readme()
 submitted_jobs = 0
 
 EXECUTOR.update_parameters(
-    slurm_partition="gpubase_l40s_b1",
+    slurm_partition="gpubase_l40s_b2",
     cpus_per_task=8,
     mem_gb=32,
     gpus_per_node=0,
-    timeout_min=180,
+    timeout_min=300,
     stderr_to_stdout=True,
 )
 
@@ -312,17 +318,22 @@ if SLURM:
 else:
     run_baselines_all()
 
+if ARGS.baselines_only:
+    if SLURM:
+        print(f"Submitted {submitted_jobs} jobs")
+    exit()
+
 
 # -------------------------------------------------------------------------------------
 # Run
 # -------------------------------------------------------------------------------------
 
 EXECUTOR.update_parameters(
-    slurm_partition="gpubase_l40s_b1",
+    slurm_partition="gpubase_l40s_b2",
     cpus_per_task=8,
     mem_gb=32,
     gpus_per_node=1,
-    timeout_min=180,
+    timeout_min=300,
     stderr_to_stdout=True,
 )
 

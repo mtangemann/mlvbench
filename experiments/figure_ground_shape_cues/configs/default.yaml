@@ -1,6 +1,0 @@
-# Default configuration for the experiment.
-
-models:
-  - standard25
-
-random_baselines: True

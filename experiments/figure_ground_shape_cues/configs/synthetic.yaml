@@ -1,0 +1,25 @@
+# Direct training on synthetic eval conditions (decodability topline).
+
+models:
+  - standard25
+
+random_baselines: False
+
+conditions:
+  - texturized
+  - surroundedness
+  - convexity
+  - symmetry
+  - parallelism
+
+# Use smaller batch sizes for models using large input resolutions. The effective batch
+# size is always 256.
+model_overrides:
+  timm/vit_pe_spatial_base_patch16_512.fb:
+    batch_size: 64
+  timm/vit_pe_spatial_large_patch14_448.fb:
+    batch_size: 64
+  timm/vit_base_patch14_reg4_dinov2.lvd142m:
+    batch_size: 64
+  timm/vit_large_patch14_reg4_dinov2.lvd142m:
+    batch_size: 64
