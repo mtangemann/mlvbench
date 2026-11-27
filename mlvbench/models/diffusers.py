@@ -9,7 +9,7 @@ import torch
 from diffusers.models.autoencoders.autoencoder_kl import AutoencoderKL
 from diffusers.models.transformers.dit_transformer_2d import DiTTransformer2DModel
 
-from mlvbench.models._base import Features, Model, TokenLayout
+from mlvbench.models._base import Features, Kind, Model, TokenLayout
 
 # We only support the DiT XL models. Review the model class below when adding more
 # models to make sure they are used correctly.
@@ -103,9 +103,16 @@ class DiffusersModel(Model):
         """The number of transformer blocks."""
         return self._transformer.config.num_layers
 
-    @property
-    def layer_names(self) -> list[str]:
-        """The names of the transformer blocks."""
+    def list_features(self, kind: Kind | None = None) -> list[str]:
+        """Return the names of the features that can be extracted.
+
+        Only layer outputs are supported.
+
+        Args:
+            kind: Only return features of this kind.
+        """
+        if kind not in (None, "layer"):
+            return []
         return [f"block.{i}" for i in range(self.num_layers)]
 
     @property

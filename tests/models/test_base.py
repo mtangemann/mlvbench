@@ -27,8 +27,9 @@ class _StubModel(Model):
     def num_layers(self) -> int:
         return 2
 
-    @property
-    def layer_names(self) -> list[str]:
+    def list_features(self, kind=None) -> list[str]:
+        if kind not in (None, "layer"):
+            return []
         return ["block.0", "block.1"]
 
     @property

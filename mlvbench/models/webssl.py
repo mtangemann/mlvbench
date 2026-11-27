@@ -10,7 +10,7 @@ import torch
 import torchvision.transforms.v2 as transforms
 from transformers import AutoImageProcessor, Dinov2Config, Dinov2Model
 
-from mlvbench.models._base import Features, Model, TokenLayout
+from mlvbench.models._base import Features, Kind, Model, TokenLayout
 
 # Model names are adapted from the HuggingFace checkpoint, dropping the "webssl-" prefix
 # and converting hyphens to underscores.
@@ -112,9 +112,16 @@ class WebSSLModel(Model):
         """The number of layers in the model."""
         return self._model.config.num_hidden_layers
 
-    @property
-    def layer_names(self) -> list[str]:
-        """The names of the model layers."""
+    def list_features(self, kind: Kind | None = None) -> list[str]:
+        """Return the names of the features that can be extracted.
+
+        Only layer outputs are supported.
+
+        Args:
+            kind: Only return features of this kind.
+        """
+        if kind not in (None, "layer"):
+            return []
         return [f"encoder.layer.{i}" for i in range(self.num_layers)]
 
     @property

@@ -9,7 +9,7 @@ from typing import Literal
 import torch
 from torchvision import transforms
 
-from mlvbench.models._base import Features, Model, TokenLayout
+from mlvbench.models._base import Features, Kind, Model, TokenLayout
 
 # Model names follow the naming convention in the official repository, but the franca_
 # prefix is dropped in favour of the "franca/" provider prefix.
@@ -169,9 +169,16 @@ class FrancaModel(Model):
         """The number of layers in the model."""
         return len(self._model.blocks)
 
-    @property
-    def layer_names(self) -> list[str]:
-        """The names of the model layers."""
+    def list_features(self, kind: Kind | None = None) -> list[str]:
+        """Return the names of the features that can be extracted.
+
+        Only layer outputs are supported.
+
+        Args:
+            kind: Only return features of this kind.
+        """
+        if kind not in (None, "layer"):
+            return []
         return [f"blocks.{i}" for i in range(self.num_layers)]
 
     @property

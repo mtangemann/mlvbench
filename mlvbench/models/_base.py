@@ -27,6 +27,10 @@ def _mlvbench_version() -> str:
         return "unknown"
 
 
+# The kinds of features a model may expose.
+Kind = Literal["layer", "query", "key", "value"]
+
+
 class Model(ABC, torch.nn.Module):
     """Base class for models."""
 
@@ -83,14 +87,27 @@ class Model(ABC, torch.nn.Module):
     def num_layers(self) -> int:
         """The number of layers in the model."""
 
-    @property
     @abstractmethod
+    def list_features(self, kind: Kind | None = None) -> list[str]:
+        """Return the names of the features that can be extracted.
+
+        These are the valid values for the `layers` argument of
+        [`forward_features`][mlvbench.models.Model.forward_features].
+
+        Args:
+            kind: Only return features of this kind.
+
+        Returns:
+            A list of feature names, e.g. ["block.0", "block.1", "block.2"].
+        """
+
+    @property
     def layer_names(self) -> list[str]:
         """The names of the model layers.
 
-        Returns:
-            A list of layer names, e.g. ["block.0", "block.1", "block.2"].
+        This is an alias for `Model.list_features(kind="layer")`
         """
+        return self.list_features(kind="layer")
 
     @property
     @abstractmethod

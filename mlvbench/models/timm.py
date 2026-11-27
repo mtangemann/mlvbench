@@ -1,14 +1,16 @@
 """Models from the timm library."""
 
-from typing import Literal
+from typing import Literal, get_args
 
 import timm
 import torch
+import torch.nn.functional as F
+from einops import rearrange
 from timm.data.config import resolve_data_config
 from timm.data.transforms_factory import create_transform
 from torchvision import transforms
 
-from mlvbench.models._base import Features, Model, TokenLayout
+from mlvbench.models._base import Features, Kind, Model, TokenLayout
 
 # For now, we only support selected ViT models. We rely on the forward_intermediates()
 # method to extract features, any model that provides this method should work in
@@ -434,10 +436,22 @@ class TimmModel(Model):
         """The number of layers in the model."""
         return len(self._model.blocks)
 
-    @property
-    def layer_names(self) -> list[str]:
-        """The names of the model layers."""
-        return [f"block.{i}" for i in range(self.num_layers)]
+    def list_features(self, kind: Kind | None = None) -> list[str]:
+        """Return the names of the features that can be extracted.
+
+        Args:
+            kind: Only return features of this kind.
+        """
+        all_kinds = get_args(Kind)
+        if kind is not None and kind not in all_kinds:
+            return []
+        kinds = all_kinds if kind is None else [kind]
+
+        return [
+            f"block.{i}:{kind}".removesuffix(":layer")
+            for i in range(self.num_layers)
+            for kind in kinds
+        ]
 
     @property
     def embed_dim(self) -> int:
@@ -509,31 +523,117 @@ class TimmModel(Model):
         images = self._transform(images)
         images = images.to(self.dtype)
 
+        # Compute here because of the readable error message raised by the
+        # self._grid_size helper for image sizes that are not divisible by the patch
+        # size.
         grid_size = self._grid_size(images)
 
-        if layers is not None:
-            indices = [self.layer_names.index(layer) for layer in layers]
-        else:
-            indices = list(range(self.num_layers))
+        if layers is None:
+            layers = self.list_features(kind="layer")
 
-        features = self._model.forward_intermediates(
-            images,
-            indices=indices,
-            return_prefix_tokens=True,
-            stop_early=True,
-            intermediates_only=True,
-            output_fmt="NLC",
-        )
+        output_indices = []
+        attention_indices = []
+
+        layer_names = self.list_features(kind="layer")
+        for layer in layers:
+            if ":" in layer:
+                layer, _ = layer.split(":", maxsplit=1)
+                attention_indices.append(layer_names.index(layer))
+            else:
+                output_indices.append(layer_names.index(layer))
+
+        layer_indices = sorted(set(output_indices + attention_indices))
+
+        # Not all models provide queries, keys and values at a module boundary. We
+        # therefore capture the inputs to attention modules and recompute the attention
+        # components manually.
+        attention_inputs: dict[int, torch.Tensor] = {}
+        handles = []
+
+        def make_hook(index: int):
+            def hook(module: torch.nn.Module, args: tuple, kwargs: dict) -> None:
+                attention_inputs[index] = args[0] if args else kwargs["x"]
+
+            return hook
+
+        for index in attention_indices:
+            handles.append(
+                self._model.blocks[index].attn.register_forward_pre_hook(
+                    make_hook(index), with_kwargs=True
+                )
+            )
 
         # With return_prefix_tokens, each entry is a (patch, prefix) tuple for models
         # with special tokens, or a plain patch tensor otherwise (e.g. SigLIP). We store
         # the full sequence [prefix, patch] and let the layout describe the split.
+        try:
+            features = self._model.forward_intermediates(
+                images,
+                indices=layer_indices,
+                return_prefix_tokens=True,
+                stop_early=True,
+                intermediates_only=True,
+                output_fmt="NLC",
+            )
+        finally:
+            for handle in handles:
+                handle.remove()
+
         tokens = {}
-        for index, feature in zip(indices, features, strict=True):
+
+        for index, feature in zip(layer_indices, features, strict=True):
             if isinstance(feature, tuple):
                 patch, prefix = feature
                 feature = torch.cat([prefix, patch], dim=1)
             tokens[f"block.{index}"] = feature.to(torch.float32)
 
+        for index in attention_indices:
+            query, key, value = _extract_qkv(
+                self._model.blocks[index].attn, attention_inputs[index],
+            )
+            tokens[f"block.{index}:query"] = query
+            tokens[f"block.{index}:key"] = key
+            tokens[f"block.{index}:value"] = value
+
+        tokens = { layer: tokens[layer] for layer in layers }
+
         layout = TokenLayout(prefix=self.token_layout.prefix, grid_size=grid_size)
         return Features(tokens, layout)
+
+
+def _extract_qkv(
+    module: torch.nn.Module, x: torch.Tensor
+) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    """Compute the queries, keys and values of a timm attention module.
+
+    Rotary position embeddings are not applied.
+
+    Args:
+        module: An attention module.
+        x: The input to the attention module with shape `(B, N, C)`.
+
+    Returns:
+        Queries, keys and values, each with shape `(B, N, num_heads * head_dim)`.
+    """
+    if getattr(module, "qkv", None) is not None:
+        bias = module.qkv.bias
+        if getattr(module, "q_bias", None) is not None:
+            bias = torch.cat((module.q_bias, module.k_bias, module.v_bias))
+        queries, keys, values = F.linear(x, module.qkv.weight, bias).chunk(3, dim=-1)
+    else:
+        queries = module.q_proj(x)
+        keys = module.k_proj(x)
+        values = module.v_proj(x)
+
+    # qk-normalization is applied per head.
+    if hasattr(module, "q_norm"):
+        queries = rearrange(queries, "B N (H D) -> B N H D", H=module.num_heads)
+        queries = module.q_norm(queries)
+        queries = rearrange(queries, "B N H D -> B N (H D)")
+
+    if hasattr(module, "k_norm"):
+        keys = rearrange(keys, "B N (H D) -> B N H D", H=module.num_heads)
+        keys = module.k_norm(keys)
+        keys = rearrange(keys, "B N H D -> B N (H D)")
+
+    return queries, keys, values
